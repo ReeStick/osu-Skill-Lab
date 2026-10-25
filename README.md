@@ -10,6 +10,7 @@ difficulty или PP и будут развиваться отдельно.
 Постоянно хранятся компактные metadata, checksums и скалярные результаты;
 загруженный файл и разобранные объекты используются только в памяти.
 Skill profile, турнирные слоты и надёжная очередь заданий — следующие этапы.
+В M1a добавлена явная сверка загруженной карты с metadata osu! API по checksum.
 
 На M0 проверены установка из lock, 25 тестов (включая PostgreSQL), Ruff,
 mypy, миграции и запуск Docker API. Подробности и реальные неудачные попытки —
@@ -44,16 +45,40 @@ Invoke-RestMethod http://localhost:8000/analyses
 файлы команды `extract-osz` HTTP-сервис не удаляет.
 
 SHA-256 обозначает точные исходные байты, MD5 сохраняется для совместимого
-checksum lookup. IDs из upload пока не сверяются с сайтом:
-`identity_status="unverified"`. Для повторного расчёта новым алгоритмом нужно
+checksum lookup. IDs из upload остаются claims:
+`identity_status="unverified"` до явной сверки через `verify-osu`.
+Для повторного расчёта новым алгоритмом нужно
 снова передать файл с соответствующим SHA-256; metadata не восстанавливает объекты.
 
 Определения измерений: [basic-features](docs/architecture/basic-features.md).
 Схема хранения: [database](docs/architecture/database.md), решение:
 [ADR-0003](docs/adr/0003-transient-inputs-compact-results.md).
-Последняя проверка: 196 тестов, включая 18 интеграционных с PostgreSQL,
-а также Docker API на 33 локальных картах. Детали и замер хранения —
+Последняя проверка: 259 тестов, включая 23 интеграционных с PostgreSQL.
+Проверки M1a: [devlog](docs/devlog/2026-10-25-osu-api-verification.md).
+Для M1 также проверен Docker API на 33 локальных картах. Детали и замер хранения —
 в [devlog M1](docs/devlog/2026-10-25-compact-analysis-pipeline.md).
+
+## Сверка с osu! API
+
+В локальном `.env` задайте `OSU_LAB_OSU_CLIENT_ID` и `OSU_LAB_OSU_CLIENT_SECRET`
+из зарегистрированного OAuth application osu!, затем пересоздайте API.
+Секрет остаётся локально; endpoint его не принимает. Настройки опциональны:
+без них raw upload и чтение анализов работают, свежая внешняя сверка даёт 503.
+
+```powershell
+docker compose up -d --wait api
+Invoke-RestMethod -Method Post http://localhost:8000/analyses/1/verify-osu
+```
+
+Укажите ID своего анализа. Успех возвращает тот же анализ с
+`beatmap.identity_status="checksum_match"`, отдельным `beatmap.osu` и сравнением
+claimed IDs. Метаданные файла остаются прежними; сохраняется выбранная metadata
+сайта и время наблюдения. GET не обращается к внешнему API.
+
+Есть OAuth token cache, TTL/cache в БД, pacing и обработка rate limit/timeout.
+Подробный контракт и настройка: [osu-api](docs/architecture/osu-api.md).
+Живая авторизованная проверка пока не выполнена: локальные credentials не заданы.
+Текущий сценарий использует загруженный `.osu`; архивы через API не скачиваются.
 
 ## Извлечение .osu из локальных .osz
 
@@ -174,7 +199,8 @@ uv run --locked alembic check
 ```
 
 Начальная ревизия `0001_foundation` создаёт только историю Alembic;
-`0002_compact_analysis` добавляет `beatmap_inputs` и `analysis_results`.
+`0002_compact_analysis` добавляет `beatmap_inputs` и `analysis_results`,
+`0003_osu_metadata` — `osu_beatmap_matches` для выбранной внешней metadata.
 При добавлении моделей импортируйте их в `migrations/env.py`, создавайте
 `uv run --locked alembic revision --autogenerate -m "description"` и проверяйте SQL
 и downgrade вручную. `create_all()` при старте API не используется.
@@ -197,7 +223,8 @@ docs/articles/          source material for future technical publications
 ```
 
 Следующие шаги и ограничения: [TASKS.md](TASKS.md), [ROADMAP.md](ROADMAP.md).
-Ближайший запланированный срез — osu! API metadata/identity перед M2 с очередью.
+Текущий срез — osu! API metadata/identity; локальная реализация проверена,
+живая OAuth-проверка ожидает credentials. Затем M2 с очередью.
 Для дальнейших метрик принят [контракт эволюции](docs/architecture/metric-evolution.md):
 официальный difficulty/pp — первая основа, точные версии вычислителей и отдельные
 семейства результатов; собственные показатели добавляются позднее.

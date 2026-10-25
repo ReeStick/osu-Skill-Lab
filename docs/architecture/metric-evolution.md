@@ -103,7 +103,7 @@ values только ради прохождения тестов. В польз�
 
 ## Связь с интеграцией osu! API
 
-Ближайший отдельный срез — metadata/identity через osu! API v2: OAuth-конфигурация,
+Срез M1a реализовал metadata/identity через osu! API v2: OAuth-конфигурация,
 lookup, checksum verification, раздельное хранение file claims и API metadata,
 кэширование и ограничения запросов. Подтверждение через совместимый checksum
 не превращает MD5 в криптографическое доказательство: SHA-256 остаётся локальной
@@ -115,8 +115,10 @@ lookup, checksum verification, раздельное хранение file claims
 `.osu` и его доступность проверяются отдельно; массовая загрузка архивов не предполагается.
 
 Очередь/retry/staging — M2. Подключение difficulty engine и сопоставление метрик —
-первый срез M3, затем собственные признаки. Сейчас нет ни OAuth-запросов, ни нового
-engine, ни новых таблиц, ни автоматического пересчёта сохранённых результатов.
+первый срез M3, затем собственные признаки. Сейчас добавлены OAuth-адаптер,
+явная checksum-сверка и metadata cache, но не quantitative attributes или новый
+difficulty/pp engine. Контракт: [osu-api](osu-api.md). Живой авторизованный запрос
+пока не выполнен из-за отсутствия локальных credentials.
 
 ## Проверенные источники, 2026-10-25
 
@@ -130,5 +132,5 @@ engine, ни новых таблиц, ни автоматического пер
   [rosu-pp-py Cargo.toml](https://github.com/MaxOhn/rosu-pp-py/blob/main/Cargo.toml)
   отделяет wrapper от underlying engine. Это кандидат, не уже выбранная зависимость.
 - [osu! API v2](https://osu.ppy.sh/docs/): lookup, beatmap metadata, difficulty
-  attributes, OAuth и правила использования. Пока прочитана документация,
-  а не выполнена авторизованная интеграция.
+  attributes, OAuth и правила использования. Metadata adapter реализован и
+  проверен локально; авторизованная проверка с настоящим сайтом ещё не выполнена.

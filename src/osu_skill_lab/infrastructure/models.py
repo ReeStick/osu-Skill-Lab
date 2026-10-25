@@ -130,3 +130,32 @@ class AnalysisResult(Base):
     raw_head_distance_min_px: Mapped[float | None] = mapped_column(Float)
     raw_head_distance_max_px: Mapped[float | None] = mapped_column(Float)
     raw_head_distance_mean_px: Mapped[float | None] = mapped_column(Float)
+
+
+class OsuBeatmapMatch(Base):
+    """Latest selected metadata observed with a matching API checksum; file claims stay intact."""
+
+    __tablename__ = "osu_beatmap_matches"
+    __table_args__ = (
+        CheckConstraint(
+            "beatmap_id > 0 AND beatmap_set_id > 0 AND creator_id > 0", name="positive_ids"
+        ),
+        CheckConstraint("octet_length(source_md5) = 16", name="md5_length"),
+    )
+
+    input_id: Mapped[int] = mapped_column(
+        ForeignKey("beatmap_inputs.id", ondelete="RESTRICT"), primary_key=True
+    )
+    beatmap_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    beatmap_set_id: Mapped[int] = mapped_column(BigInteger)
+    source_md5: Mapped[bytes] = mapped_column(LargeBinary)
+    title: Mapped[str] = mapped_column(String(512))
+    artist: Mapped[str] = mapped_column(String(512))
+    set_creator: Mapped[str] = mapped_column(String(256))
+    creator_id: Mapped[int] = mapped_column(BigInteger)
+    difficulty_name: Mapped[str] = mapped_column(String(512))
+    status: Mapped[str] = mapped_column(String(32))
+    last_updated: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    api_response_version: Mapped[str] = mapped_column(String(16))
+    metadata_schema_version: Mapped[str] = mapped_column(String(64))

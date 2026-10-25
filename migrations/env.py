@@ -9,7 +9,11 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from osu_skill_lab.config import Settings
 from osu_skill_lab.infrastructure.database import Base
-from osu_skill_lab.infrastructure.models import AnalysisResult, BeatmapInput  # noqa: F401
+from osu_skill_lab.infrastructure.models import (  # noqa: F401
+    AnalysisResult,
+    BeatmapInput,
+    OsuBeatmapMatch,
+)
 
 config = context.config
 if config.config_file_name is not None:

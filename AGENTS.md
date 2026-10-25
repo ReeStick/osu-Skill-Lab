@@ -43,6 +43,15 @@ versions и расширения столбцов — `docs/architecture/metric-
 Этот контракт пока проектный: перед первым внешним расчётом реализуйте его
 provenance/identity в коде и миграции, не назначайте выдуманные версии API-данным.
 
+osu! API сверка явная: `POST /analyses/{id}/verify-osu`. Lookup отправляет только
+checksum; file IDs не являются fallback. Выбранная metadata хранится отдельно
+в `osu_beatmap_matches`, статус `checksum_match` означает наблюдение MD5 на
+`fetched_at`, не гарантию текущей редакции. Claims и features не обновляются.
+`OSU_LAB_OSU_CLIENT_ID/SECRET` опциональны вместе; не печатайте credentials,
+OAuth responses или `docker compose config` с секретами. Нет eager OAuth на старте.
+Лимиты HTTP/cache действуют на один процесс: перед масштабированием нужен общий
+бюджет запросов. Контракт и ограничения download: `docs/architecture/osu-api.md`.
+
 ## Команды из корня
 
 ```text

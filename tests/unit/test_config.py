@@ -52,3 +52,52 @@ def test_url_encoded_password_is_preserved() -> None:
     assert (
         Settings(_env_file=None, database_url=SecretStr(url)).database_url.get_secret_value() == url
     )
+
+
+def test_osu_credentials_are_optional_and_blank_compose_values_disable_them(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OSU_LAB_OSU_CLIENT_ID", "")
+    monkeypatch.setenv("OSU_LAB_OSU_CLIENT_SECRET", "")
+    settings = Settings(_env_file=None, database_url=SecretStr(DATABASE_URL))
+    assert settings.osu_client_id is None
+    assert settings.osu_client_secret is None
+
+
+@pytest.mark.parametrize("missing", ["id", "secret"])
+def test_osu_credentials_must_be_configured_together(missing: str) -> None:
+    with pytest.raises(ValidationError, match="configured together") as error:
+        Settings(
+            _env_file=None,
+            database_url=SecretStr(DATABASE_URL),
+            osu_client_id=None if missing == "id" else 123,
+            osu_client_secret=None if missing == "secret" else SecretStr("private-osu-secret"),
+        )
+    assert "private-osu-secret" not in str(error.value)
+
+
+def test_osu_secret_is_hidden_from_representation_and_serialization() -> None:
+    settings = Settings(
+        _env_file=None,
+        database_url=SecretStr(DATABASE_URL),
+        osu_client_id=123,
+        osu_client_secret=SecretStr("private-osu-secret"),
+    )
+    assert "private-osu-secret" not in repr(settings) + settings.model_dump_json()
+
+
+@pytest.mark.parametrize("secret", [" ", "x" * 4097], ids=["blank", "too_long"])
+def test_osu_secret_has_bounded_nonblank_content(secret: str) -> None:
+    with pytest.raises(ValidationError):
+        Settings(
+            _env_file=None,
+            database_url=SecretStr(DATABASE_URL),
+            osu_client_id=123,
+            osu_client_secret=SecretStr(secret),
+        )
+
+
+@pytest.mark.parametrize("ttl", [0, 59, 86401])
+def test_osu_cache_ttl_is_bounded_and_at_least_one_minute(ttl: int) -> None:
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, database_url=SecretStr(DATABASE_URL), osu_cache_ttl_seconds=ttl)

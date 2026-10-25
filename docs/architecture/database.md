@@ -5,6 +5,8 @@
 PostgreSQL 17, SQLAlchemy 2.0 async с asyncpg, Alembic через `run_sync`.
 После пустого baseline `0001_foundation` ревизия `0002_compact_analysis`
 создаёт две предметные таблицы: `beatmap_inputs` и `analysis_results`.
+Ревизия `0003_osu_metadata` добавляет третью — `osu_beatmap_matches` для
+отдельного кеша metadata, полученной при явной сверке с сайтом.
 Решение о временном входе и компактных результатах:
 [ADR-0003](../adr/0003-transient-inputs-compact-results.md).
 
@@ -35,11 +37,12 @@ HTTP-сценарий вообще не создаёт файлов: огран�
 SHA-256 и MD5 вычисляются по одному и тому же snapshot исходных байтов.
 В HTTP-ответе digest представлен hex-строкой; в PostgreSQL он хранится в
 двоичном виде. MD5 не обеспечивает уникальность: разные SHA-256 допускаются
-при одинаковом MD5. Внешний checksum lookup пока не реализован.
+при одинаковом MD5. Внешний lookup реализован в явном `verify-osu` сценарии.
 
-IDs внутри пользовательского `.osu` не проверяются на сайте. Ответ содержит
-`identity_status="unverified"`; этот статус сейчас определяется контрактом,
-отдельного столбца подтверждения в БД нет. Claimed IDs не уникальны: несколько
+IDs внутри пользовательского `.osu` остаются claims. Без явной сверки ответ
+содержит `identity_status="unverified"`; при наличии соответствующей строки
+`osu_beatmap_matches` — `checksum_match` и отдельную API metadata с временем.
+Отдельного scalar столбца статуса в input нет. Claimed IDs не уникальны: несколько
 изменённых файлов могут заявлять один BeatmapID и BeatmapSetID. Отсутствующие
 IDs, 0 и -1 reader переводит в `NULL`. Поиск по claimed ID находит утверждения
 файлов, а не доказывает соответствие официальной карте. Поэтому сейчас нет
@@ -50,6 +53,26 @@ SHA-256 и отдельный вход. Совпадение измерений 
 Повторный импорт существующего SHA-256 не перезаписывает metadata, MD5 или
 `metadata_parser_version`. Неизменяемость обеспечивается текущим сценарием
 записи без `UPDATE`; SQL-триггера, запрещающего изменения администратору, нет.
+
+## Metadata сайта: osu_beatmap_matches
+
+Одна строка на input, `input_id` одновременно PK и FK с `ON DELETE RESTRICT`.
+Хранит API beatmap/set IDs, 16-байтовый MD5, title/artist, `set_creator`, creator ID,
+difficulty name, status, `last_updated`, `fetched_at`, API response version и
+metadata schema version. Строки имеют те же ограничения длины, что API DTO;
+MD5 length и положительные IDs дополнительно проверяются БД.
+
+Repository сравнивает checksum с `beatmap_inputs.source_md5` до upsert. Это
+application invariant: SQL CHECK не сравнивает digest с другой таблицей.
+Связь не перезаписывает metadata файла. Более старое время наблюдения не может
+заменить свежее при конкурентной проверке. Это обновляемый кеш metadata;
+история изменений API не сохраняется, количественные метрики сюда не входят.
+По beatmap_id есть неуникальный индекс; один сайт ID может иметь несколько inputs.
+
+Analysis query использует LEFT JOIN, поэтому отсутствие сверки сохраняет
+доступность raw результатов. Positive cache в БД действует по `fetched_at`
+и TTL; GET читает даже старое наблюдение со временем, refresh выполняется явно.
+Подробности: [osu-api](osu-api.md), [ADR-0005](../adr/0005-osu-checksum-metadata.md).
 
 ## Результаты: analysis_results
 
@@ -156,7 +179,7 @@ SQLite и `create_all()` эти проверки не подменяют.
 
 ## Расширение difficulty/pp — принятое направление
 
-Текущие две таблицы и 22 raw поля не объявляются окончательной моделью всех метрик.
+Текущие raw результаты и 22 поля не объявляются окончательной моделью всех метрик.
 Перед подключением внешнего вычислителя добавятся отдельные типизированные
 семейства difficulty/performance и provenance engine/build/upstream/adapter/schema.
 Новые столбцы вводятся миграциями, старые snapshots сохраняются. Performance

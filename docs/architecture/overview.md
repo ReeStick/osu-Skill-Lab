@@ -1,6 +1,6 @@
 # Архитектура
 
-## Реализовано в M0 и M1
+## Реализовано в M0, M1 и срезе M1a
 
 Модульный монолит с одним Python-пакетом. `main.create_app` — точка сборки;
 `config.Settings` валидирует окружение. `api/` содержит транспорт и зависимости,
@@ -27,6 +27,9 @@ flowchart LR
     Compact --> Repository[SQLAlchemy repository]
     Repository --> PG[(PostgreSQL)]
     API --> Health[Health routes]
+    API --> Verify[Explicit checksum verification]
+    Verify --> Osu[osu! API public metadata]
+    Verify --> Repository
     Health --> DBAdapter[Async SQLAlchemy adapter]
     DBAdapter --> PG
     Migration[Alembic process] --> PG
@@ -46,11 +49,15 @@ HTTP ожидает результат. При отмене запроса сл�
 процесса. Исходные байты и массивы не пишутся на диск и не возвращаются из
 CPU-процесса: наружу выходят только компактные данные для одной транзакции.
 
-В PostgreSQL две таблицы: fingerprint входа и versioned scalar result.
+В PostgreSQL fingerprint входа, versioned scalar result и отдельный кеш metadata osu!.
 Повторы защищены unique constraints; два конкурента могут выполнить расчёт,
 но сохранить один результат. Подробности: [database](database.md),
 [признаки](basic-features.md), [ADR-0003](../adr/0003-transient-inputs-compact-results.md).
 Offline extraction остаётся отдельным инструментом подготовки корпуса.
+
+`verify-osu` сопоставляет сохранённый MD5 с внешней metadata через OAuth guest token.
+Сеть не требуется при upload/GET/health. API match сохраняется отдельно от file
+claims; есть TTL, pacing и bounded HTTP. Контракт: [osu-api](osu-api.md).
 
 `domain/` и `workers/` появятся при соответствующих сценариях. Analysis не
 импортирует FastAPI или SQLAlchemy. Надёжность фоновых заданий не обеспечивается
@@ -76,5 +83,6 @@ difficulty и score-dependent performance развиваются отдельн�
 
 PostgreSQL обязателен для интеграционных тестов; это сложнее in-memory SQLite,
 зато проверяет реальный драйвер, транзакции и миграции. Нет Redis, RabbitMQ и
-численных библиотек до сценария, которому они нужны. В M1 нет auth, сетевого
-импорта и публичного развёртывания. Локальные порты доступны только loopback.
+численных библиотек до сценария, которому они нужны. Нет пользовательской auth
+наших endpoints и публичного развёртывания. Внешний OAuth служит только public
+metadata lookup; download исходников не реализован. Локальные порты — loopback.

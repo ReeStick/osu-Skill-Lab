@@ -6,6 +6,8 @@
 
 ### Added
 
+- Явная сверка сохранённого анализа с osu! API: OAuth public lookup по checksum,
+  отдельная metadata, статус `checksum_match`, cache/rate limits и сетевые ошибки.
 - REST-анализ `.osu`: `POST /analyses`, чтение результата и список с пагинацией.
 - 22 базовых scalar features: counts, red BPM, start span, интервалы и raw
   расстояния heads с математическим контрактом `basic-raw/1`.

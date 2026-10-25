@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | 0 — Project Foundation | Установка по lock, API, реальная БД, миграции, тесты, CI, документация | Завершён 2026-10-25; CI настроен, удалённо не запускался |
 | 1 — Beatmap Analysis MVP | Локальная `.osu` → проверка входа → измеряемые признаки → сохранённый результат через REST | Завершён 2026-10-25; вход временный, metadata и результаты постоянные |
-| 1a — osu! API integration | Metadata/identity, checksum verification, OAuth, cache/rate limits, разрешённый on-demand input | Ближайший срез; не реализован |
+| 1a — osu! API integration | Metadata/identity загруженной карты, checksum verification, OAuth, cache/rate limits | Реализовано и проверено локально; живая OAuth-проверка ожидает credentials |
 | 2 — Background Processing | RabbitMQ, отдельный worker, состояния, retry, идемпотентность, версии | Не начат |
 | 3 — Feature Engineering | Сначала versioned osu! difficulty engine и upstream метрики, затем собственные определения, тесты и сегменты | Не начат; контракт эволюции принят в ADR-0004 |
 | 4 — Skill Classification | Размеченный набор, baseline, оценка ошибок и ограничений; ML только при достаточных данных | Не начат |
@@ -25,9 +25,12 @@
 
 NumPy, SciPy, rosu-pp-py, HTTPX в runtime, RabbitMQ и Redis добавляются только
 под конкретные сценарии. На M0 HTTPX нужен исключительно для тестов API.
-Локальные `.osu` уже поддержаны. Перед M2 выделен срез M1a для osu! API v2:
-сначала metadata/identity и ограничения, затем разрешённое получение входа.
-Документация прочитана; авторизованная интеграция пока не выполнена.
+Локальные `.osu` поддержаны; M1a добавил явную checksum-сверку с metadata API v2.
+Авторизованный запрос к настоящему сайту пока не выполнен: нужны локальные credentials.
+Download `.osz` в документации помечен lazer и недоступен обычному client credentials
+grant. On-demand file import требует отдельного проверенного источника;
+текущий законченный сценарий использует локальный upload.
+Контракт: [osu-api](docs/architecture/osu-api.md).
 
 Уточнение владельца на M1: постоянно хранятся только metadata и результаты,
 исходник существует во время обработки. Для M2 потребуется определить временный

@@ -4,6 +4,7 @@ from typing import Literal
 
 from osu_skill_lab.analysis.features import BasicFeatures
 from osu_skill_lab.analysis.models import DifficultySettings
+from osu_skill_lab.application.osu_metadata import OsuMetadata
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,7 +22,9 @@ class BeatmapIdentity:
     creator: str
     difficulty_name: str
     metadata_parser_version: str
-    identity_status: Literal["unverified"] = "unverified"
+    identity_status: Literal["unverified", "checksum_match"] = "unverified"
+    osu: OsuMetadata | None = None
+    claimed_ids_match: bool | None = None
 
 
 @dataclass(frozen=True, slots=True)

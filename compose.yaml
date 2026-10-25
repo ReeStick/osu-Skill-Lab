@@ -8,6 +8,10 @@ x-app: &app
     # Host DSN from .env is intentionally replaced by the Compose service hostname.
     OSU_LAB_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-osu_lab}:${POSTGRES_PASSWORD:-osu_lab_local}@db:5432/${POSTGRES_DB:-osu_skill_lab}
     OSU_LAB_DATABASE_TIMEOUT_SECONDS: ${OSU_LAB_DATABASE_TIMEOUT_SECONDS:-3}
+    OSU_LAB_OSU_CLIENT_ID: ${OSU_LAB_OSU_CLIENT_ID:-}
+    OSU_LAB_OSU_CLIENT_SECRET: ${OSU_LAB_OSU_CLIENT_SECRET:-}
+    OSU_LAB_OSU_TIMEOUT_SECONDS: ${OSU_LAB_OSU_TIMEOUT_SECONDS:-10}
+    OSU_LAB_OSU_CACHE_TTL_SECONDS: ${OSU_LAB_OSU_CACHE_TTL_SECONDS:-3600}
 
 services:
   db:

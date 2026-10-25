@@ -2,8 +2,29 @@
 
 **Milestone 0 — Project Foundation завершён** (2026-10-25).
 **Milestone 1 — Beatmap Analysis MVP завершён** (2026-10-25).
-Ближайший срез — **M1a: osu! API metadata/identity**, затем M2 с очередью.
-Оба этапа пока не реализованы.
+Текущий срез — **M1a: osu! API metadata/identity**. Реализация и локальные проверки
+готовы; живая OAuth-проверка ожидает локальных credentials. M2 не начат.
+
+## Последний срез M1a — явная сверка с osu! API
+
+- [x] Optional OAuth client credentials/public, tokens в RAM, парные настройки и Compose.
+- [x] `POST /analyses/{id}/verify-osu`, lookup только по сохранённому MD5.
+- [x] Отдельная типизированная metadata-таблица с миграцией `0003_osu_metadata`.
+- [x] `checksum_match`, API metadata/time, nullable сравнение file claims; исходные claims/results сохранены.
+- [x] Positive TTL в БД, bounded memory cache, pacing, 401 retry один раз, 429 cooldown.
+- [x] Body/time limits, безопасные 404/409/422/429/502/503/504; отмена/перегрузка.
+- [x] 259 passed: 236 unit и 23 real PostgreSQL integration, без skip.
+- [x] Ruff lint/format (последняя проверка: 83 файла), mypy (51 файл), locked offline sync.
+- [x] Docker build/run, health 200; текущая БД на head, `alembic check` без drift.
+- [x] Disabled OAuth в Docker даёт ожидаемый 503 `osu_not_configured`, анализ читается.
+- [x] После обрыва восстановлен Docker Engine; повторно 23 PostgreSQL integration passed.
+- [x] Download/attributes API исследованы: архивный lazer route не используется,
+  количественные attributes не сохраняются до реализации ADR-0004.
+- [ ] Одна живая авторизованная сверка после настройки локального OAuth application.
+
+Контракт: [osu-api](docs/architecture/osu-api.md),
+[ADR-0005](docs/adr/0005-osu-checksum-metadata.md).
+Фактические проверки: [devlog](docs/devlog/2026-10-25-osu-api-verification.md).
 
 ## Уточнение перед osu! API и metric engineering
 
@@ -13,7 +34,7 @@
   versions, явный score context и миграции новых типизированных полей.
 - [x] Зафиксировано: текущий `basic-raw/1` — baseline, не финальный набор метрик.
 - [x] Ближайший срез API выделен перед очередью; difficulty engine — начало M3,
-  собственные метрики позже. Новых runtime-полей или расчётов пока нет.
+  собственные метрики позже. Контракт difficulty/pp пока проектный.
 
 Контракт: [metric-evolution](docs/architecture/metric-evolution.md).
 История: [devlog](docs/devlog/2026-10-25-metric-evolution-plan.md).
@@ -102,20 +123,13 @@
 временных файлов Windows понадобился доступ вне sandbox. GitHub Actions
 сконфигурирован, но удалённый запуск не подтверждён: push не выполнялся.
 
-## Ближайшие задачи M1a — osu! API
+## Остаток M1a
 
-1. Реализовать адаптер API v2 и OAuth-конфигурацию с безопасным хранением секретов,
-   timeout, кэшированием и ограничениями запросов по актуальной документации.
-2. Lookup/checksum и metadata: отличать file claims от подтверждённой API identity,
-   сохранять источник/время проверки и обрабатывать изменившуюся редакцию карты.
-3. Уточнить разрешённое получение `.osu` on demand; API metadata не заменяет objects,
-   а исходники остаются временными. Не обещать доступность исторического файла.
-4. Проверить контракт difficulty attributes endpoint и provenance его snapshot;
-   не приписывать API-результату неизвестную engine revision.
-5. Протестировать успешный импорт, checksum mismatch, отсутствие карты,
-   истечение токена, rate limit, недоступность внешнего сервиса и cache reuse.
-
-Авторизованные запросы и новый API adapter ещё не выполнены/не реализованы.
+Настроить `OSU_LAB_OSU_CLIENT_ID` и `OSU_LAB_OSU_CLIENT_SECRET` локально и выполнить
+одну сверку существующего анализа с сайтом, зафиксировав результат без секретов.
+Внешняя доступность/наличие карты не подтверждаются synthetic транспортом.
+On-demand file import выделяется отдельно после проверки подходящего источника;
+автоматическое скачивание архива обычным API-токеном не предполагается.
 
 ## После M1a — задачи M2
 
@@ -141,7 +155,10 @@
 - Нет долговечной очереди и автоматического восстановления сломанного process pool:
   `BrokenProcessPool` даёт 503 до перезапуска экземпляра API. Состояния/retry — M2.
 - Повтор upload может заново выполнить CPU-расчёт; дедуплицируется сохранение.
-- IDs карты не сверены с osu! API; сетевой импорт пока отсутствует.
+- Runtime поддерживает явную checksum-сверку, но на текущем реальном корпусе
+  она ещё не выполнена: credentials не настроены. Download исходника не реализован.
+- Pacing/cache/cooldown пока локальны одному API-процессу; общий client ID при
+  масштабировании потребует распределённого бюджета запросов.
 - После освобождения входа новый анализ требует повторного upload точных байтов;
   доступность исторической версии на сайте не гарантируется.
 

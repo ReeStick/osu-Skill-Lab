@@ -12,11 +12,33 @@ from osu_skill_lab.application.contracts import (
     BeatmapIdentity,
     SaveAnalysisOutcome,
 )
+from osu_skill_lab.application.osu_metadata import OsuMetadata
 from osu_skill_lab.application.preparation import PreparedAnalysis
-from osu_skill_lab.infrastructure.models import AnalysisResult, BeatmapInput
+from osu_skill_lab.infrastructure.models import AnalysisResult, BeatmapInput, OsuBeatmapMatch
 
 
-def _record(result: AnalysisResult, source: BeatmapInput) -> AnalysisRecord:
+def _record(
+    result: AnalysisResult, source: BeatmapInput, match: OsuBeatmapMatch | None
+) -> AnalysisRecord:
+    metadata = (
+        OsuMetadata(
+            match.beatmap_id,
+            match.beatmap_set_id,
+            match.source_md5.hex(),
+            match.title,
+            match.artist,
+            match.set_creator,
+            match.creator_id,
+            match.difficulty_name,
+            match.status,
+            match.last_updated,
+            match.fetched_at,
+            match.api_response_version,
+            match.metadata_schema_version,
+        )
+        if match is not None
+        else None
+    )
     return AnalysisRecord(
         result.id,
         BeatmapIdentity(
@@ -33,6 +55,18 @@ def _record(result: AnalysisResult, source: BeatmapInput) -> AnalysisRecord:
             source.creator,
             source.difficulty_name,
             source.metadata_parser_version,
+            "checksum_match" if match is not None else "unverified",
+            metadata,
+            (
+                source.claimed_beatmap_id in {None, match.beatmap_id}
+                and source.claimed_beatmap_set_id in {None, match.beatmap_set_id}
+                if match is not None
+                and (
+                    source.claimed_beatmap_id is not None
+                    or source.claimed_beatmap_set_id is not None
+                )
+                else None
+            ),
         ),
         result.algorithm_version,
         result.parser_version,
@@ -52,8 +86,10 @@ def _record(result: AnalysisResult, source: BeatmapInput) -> AnalysisRecord:
 async def get_analysis(session: AsyncSession, analysis_id: int) -> AnalysisRecord | None:
     row = (
         await session.execute(
-            select(AnalysisResult, BeatmapInput)
-            .join(BeatmapInput)
+            select(AnalysisResult, BeatmapInput, OsuBeatmapMatch)
+            .select_from(AnalysisResult)
+            .join(BeatmapInput, AnalysisResult.input_id == BeatmapInput.id)
+            .outerjoin(OsuBeatmapMatch, OsuBeatmapMatch.input_id == BeatmapInput.id)
             .where(AnalysisResult.id == analysis_id)
         )
     ).one_or_none()
@@ -64,7 +100,11 @@ async def list_analyses(
     session: AsyncSession, *, limit: int, after_id: int, claimed_beatmap_id: int | None = None
 ) -> AnalysisPage:
     query = (
-        select(AnalysisResult, BeatmapInput).join(BeatmapInput).where(AnalysisResult.id > after_id)
+        select(AnalysisResult, BeatmapInput, OsuBeatmapMatch)
+        .select_from(AnalysisResult)
+        .join(BeatmapInput, AnalysisResult.input_id == BeatmapInput.id)
+        .outerjoin(OsuBeatmapMatch, OsuBeatmapMatch.input_id == BeatmapInput.id)
+        .where(AnalysisResult.id > after_id)
     )
     if claimed_beatmap_id is not None:
         query = query.where(BeatmapInput.claimed_beatmap_id == claimed_beatmap_id)

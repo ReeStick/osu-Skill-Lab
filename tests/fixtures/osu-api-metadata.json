@@ -1,0 +1,19 @@
+{
+  "id": 123,
+  "beatmapset_id": 456,
+  "user_id": 7,
+  "checksum": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "mode": "osu",
+  "version": "Synthetic difficulty",
+  "status": "ranked",
+  "last_updated": "2026-10-01T12:00:00Z",
+  "beatmapset": {
+    "id": 456,
+    "title": "Synthetic API title",
+    "artist": "Synthetic API artist",
+    "creator": "Synthetic set creator"
+  },
+  "difficulty_rating": 123.456,
+  "failtimes": {"fail": [1, 2, 3]},
+  "unknown_future_field": {"not_persisted": true}
+}
