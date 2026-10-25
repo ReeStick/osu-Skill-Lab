@@ -66,6 +66,12 @@ Difficulty и PP — отдельные будущие расчёты. Теку�
 входа, версии, конфигурацию raw/no-mods и 22 измерения уровня A. Skill profile,
 качество классификации и турнирные слоты пока не вычисляются.
 
+Выбор следующих метрик опирается на официальный difficulty/performance code osu!.
+Внешний вычислитель подключается через adapter с точной engine/upstream identity;
+difficulty и score-dependent performance развиваются отдельными семействами.
+Контракт расширения и сохранения истории принят, но runtime этих расчётов пока нет:
+[metric-evolution](metric-evolution.md).
+
 ## Компромиссы
 
 PostgreSQL обязателен для интеграционных тестов; это сложнее in-memory SQLite,

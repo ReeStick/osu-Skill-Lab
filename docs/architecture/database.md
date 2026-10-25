@@ -153,3 +153,14 @@ Alembic поднимает схему в изолированном случай
 rollback, одинаковые claimed IDs/MD5, пагинацию, nullable measurements,
 отказ при большом configuration и фактическое отсутствие массивов/feature blob.
 SQLite и `create_all()` эти проверки не подменяют.
+
+## Расширение difficulty/pp — принятое направление
+
+Текущие две таблицы и 22 raw поля не объявляются окончательной моделью всех метрик.
+Перед подключением внешнего вычислителя добавятся отдельные типизированные
+семейства difficulty/performance и provenance engine/build/upstream/adapter/schema.
+Новые столбцы вводятся миграциями, старые snapshots сохраняются. Performance
+потребует score/scenario и связи с соответствующим difficulty snapshot.
+Эти таблицы/поля пока не созданы; текущий runtime хранит только `basic-raw/1`.
+Контракт: [metric-evolution](metric-evolution.md),
+[ADR-0004](../adr/0004-versioned-metric-families.md).

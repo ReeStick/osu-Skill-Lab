@@ -7,6 +7,7 @@
 - [0001 — Модульный монолит](0001-modular-monolith.md).
 - [0002 — PostgreSQL и async persistence](0002-postgresql-async.md).
 - [0003 — Временные входы и компактные результаты](0003-transient-inputs-compact-results.md).
+- [0004 — Версии вычислителей и семейства метрик](0004-versioned-metric-families.md).
 
 ## Шаблон
 

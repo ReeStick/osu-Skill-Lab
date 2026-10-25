@@ -34,6 +34,15 @@ gameplay values различаются; контракт в `docs/architecture/o
 offline extraction принадлежат пользователю; сервис не должен удалять их
 как свои временные upload-файлы.
 
+При выборе метрик сначала сверяйтесь с официальным difficulty/performance code
+и релизами osu!, затем с поддерживаемой ревизией выбранного port/binding.
+Difficulty, score-dependent pp и будущие собственные признаки имеют отдельные
+контракты. Версия wrapper не заменяет engine/upstream revision; обновление
+вычислителя не перезаписывает старые результаты. План семейства/adapter/schema
+versions и расширения столбцов — `docs/architecture/metric-evolution.md`, ADR-0004.
+Этот контракт пока проектный: перед первым внешним расчётом реализуйте его
+provenance/identity в коде и миграции, не назначайте выдуманные версии API-данным.
+
 ## Команды из корня
 
 ```text
