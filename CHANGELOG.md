@@ -6,6 +6,8 @@
 
 ### Added
 
+- Hinamizawa metadata batch adapter и `POST /imports/hinamizawa/{beatmap_id}`:
+  raw download с checksum/SHA pin, независимая provenance, cache и source limits.
 - Явная сверка сохранённого анализа с osu! API: OAuth public lookup по checksum,
   отдельная metadata, статус `checksum_match`, cache/rate limits и сетевые ошибки.
 - REST-анализ `.osu`: `POST /analyses`, чтение результата и список с пагинацией.

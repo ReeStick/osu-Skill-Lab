@@ -5,6 +5,7 @@ from typing import Literal
 from osu_skill_lab.analysis.features import BasicFeatures
 from osu_skill_lab.analysis.models import DifficultySettings
 from osu_skill_lab.application.osu_metadata import OsuMetadata
+from osu_skill_lab.application.sources import SourceObservation
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,6 +26,7 @@ class BeatmapIdentity:
     identity_status: Literal["unverified", "checksum_match"] = "unverified"
     osu: OsuMetadata | None = None
     claimed_ids_match: bool | None = None
+    sources: tuple[SourceObservation, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

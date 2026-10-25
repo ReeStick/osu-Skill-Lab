@@ -159,3 +159,37 @@ class OsuBeatmapMatch(Base):
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     api_response_version: Mapped[str] = mapped_column(String(16))
     metadata_schema_version: Mapped[str] = mapped_column(String(64))
+
+
+class BeatmapSource(Base):
+    __tablename__ = "beatmap_sources"
+    __table_args__ = (
+        UniqueConstraint(
+            "input_id",
+            "provider",
+            "requested_beatmap_id",
+            "adapter_version",
+            "metadata_schema_version",
+            name="uq_beatmap_sources_observation",
+        ),
+        CheckConstraint("provider = 'hinamizawa'", name="known_provider"),
+        CheckConstraint(
+            "requested_beatmap_id > 0 AND metadata_beatmap_set_id > 0", name="positive_ids"
+        ),
+        CheckConstraint("octet_length(metadata_md5) = 16", name="md5_length"),
+    )
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    input_id: Mapped[int] = mapped_column(ForeignKey("beatmap_inputs.id", ondelete="RESTRICT"))
+    provider: Mapped[str] = mapped_column(String(32))
+    requested_beatmap_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    metadata_beatmap_set_id: Mapped[int] = mapped_column(BigInteger)
+    metadata_md5: Mapped[bytes] = mapped_column(LargeBinary)
+    adapter_version: Mapped[str] = mapped_column(String(64))
+    metadata_schema_version: Mapped[str] = mapped_column(String(64))
+    metadata_last_updated: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    metadata_fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    file_fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    metadata_source_layer: Mapped[str | None] = mapped_column(String(64))
+    file_source_layer: Mapped[str | None] = mapped_column(String(64))
+    metadata_freshness: Mapped[str | None] = mapped_column(String(64))
+    http_etag: Mapped[str | None] = mapped_column(String(512))

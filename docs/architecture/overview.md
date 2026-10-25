@@ -28,6 +28,9 @@ flowchart LR
     Repository --> PG[(PostgreSQL)]
     API --> Health[Health routes]
     API --> Verify[Explicit checksum verification]
+    API --> Import[Single-file import service]
+    Import --> Mirror[Hinamizawa metadata and raw file]
+    Import --> Service
     Verify --> Osu[osu! API public metadata]
     Verify --> Repository
     Health --> DBAdapter[Async SQLAlchemy adapter]
@@ -49,7 +52,8 @@ HTTP ожидает результат. При отмене запроса сл�
 процесса. Исходные байты и массивы не пишутся на диск и не возвращаются из
 CPU-процесса: наружу выходят только компактные данные для одной транзакции.
 
-В PostgreSQL fingerprint входа, versioned scalar result и отдельный кеш metadata osu!.
+В PostgreSQL fingerprint входа, versioned scalar result, кеш metadata osu!
+и независимые download source observations.
 Повторы защищены unique constraints; два конкурента могут выполнить расчёт,
 но сохранить один результат. Подробности: [database](database.md),
 [признаки](basic-features.md), [ADR-0003](../adr/0003-transient-inputs-compact-results.md).
@@ -58,6 +62,11 @@ Offline extraction остаётся отдельным инструментом 
 `verify-osu` сопоставляет сохранённый MD5 с внешней metadata через OAuth guest token.
 Сеть не требуется при upload/GET/health. API match сохраняется отдельно от file
 claims; есть TTL, pacing и bounded HTTP. Контракт: [osu-api](osu-api.md).
+
+`imports/hinamizawa/{id}` использует отдельный источник без OAuth credentials,
+скачивает bounded raw file, проверяет hashes/IDs и передаёт bytes существующему
+CPU-сценарию. Source observations сохраняются атомарно с result; официальный
+match не присваивается по mirror metadata. Контракт: [mirror-import](mirror-import.md).
 
 `domain/` и `workers/` появятся при соответствующих сценариях. Analysis не
 импортирует FastAPI или SQLAlchemy. Надёжность фоновых заданий не обеспечивается
@@ -85,4 +94,5 @@ PostgreSQL обязателен для интеграционных тестов
 зато проверяет реальный драйвер, транзакции и миграции. Нет Redis, RabbitMQ и
 численных библиотек до сценария, которому они нужны. Нет пользовательской auth
 наших endpoints и публичного развёртывания. Внешний OAuth служит только public
-metadata lookup; download исходников не реализован. Локальные порты — loopback.
+metadata lookup; Hinamizawa single-file download работает, durable batch ещё нет.
+Локальные порты — loopback.

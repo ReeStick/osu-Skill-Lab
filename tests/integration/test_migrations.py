@@ -31,6 +31,7 @@ def exercise_migrations(connection: Connection) -> None:
         "alembic_version",
         "analysis_results",
         "beatmap_inputs",
+        "beatmap_sources",
         "osu_beatmap_matches",
     ]
 

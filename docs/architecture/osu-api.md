@@ -130,7 +130,8 @@ API documentation помечает download архива как `lazer`, а та
 Для M2 принят отдельный mirror provider, с собственным контрактом и provenance,
 по [ADR-0006](../adr/0006-mirror-batch-import.md). Он не является другим адресом
 официального OAuth client и не гарантирует доступность исторической редакции.
-Проект on-demand/batch сценария: [batch-import](batch-import.md).
+Single-file mirror import уже реализован: [mirror-import](mirror-import.md).
+Проект долговечного batch сценария: [batch-import](batch-import.md).
 
 `POST /beatmaps/{beatmap}/attributes` документирован для difficulty с mods/ruleset.
 Endpoint исследован, но в этом срезе не вызывается и его значения не сохраняются.

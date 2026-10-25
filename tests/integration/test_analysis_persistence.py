@@ -286,7 +286,12 @@ async def test_actual_schema_has_only_digest_bytes_and_configuration_json(
         columns = await connection.run_sync(
             lambda sync_connection: {
                 table: inspect(sync_connection).get_columns(table)
-                for table in ("beatmap_inputs", "analysis_results", "osu_beatmap_matches")
+                for table in (
+                    "beatmap_inputs",
+                    "analysis_results",
+                    "osu_beatmap_matches",
+                    "beatmap_sources",
+                )
             }
         )
 
@@ -315,5 +320,6 @@ async def test_actual_schema_has_only_digest_bytes_and_configuration_json(
         ("beatmap_inputs", "source_md5"),
         ("analysis_results", "configuration_sha256"),
         ("osu_beatmap_matches", "source_md5"),
+        ("beatmap_sources", "metadata_md5"),
     }
     assert json_columns == {("analysis_results", "configuration")}

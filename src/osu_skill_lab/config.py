@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     osu_client_secret: SecretStr | None = Field(default=None, repr=False)
     osu_timeout_seconds: float = Field(default=10.0, gt=0, le=30)
     osu_cache_ttl_seconds: int = Field(default=3600, ge=60, le=86400)
+    mirror_timeout_seconds: float = Field(default=20.0, gt=0, le=30)
+    mirror_cache_ttl_seconds: int = Field(default=600, ge=60, le=86400)
 
     @field_validator("osu_client_id", "osu_client_secret", mode="before")
     @classmethod

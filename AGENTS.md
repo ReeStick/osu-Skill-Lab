@@ -55,6 +55,9 @@ OAuth responses или `docker compose config` с секретами. Нет eag
 Первый прикладной сценарий M2 — batch import через явно выбранные sources.
 Проект: `docs/architecture/batch-import.md`, ADR-0006. Mirror metadata/download
 не подменяют официальный `verify-osu`; бюджеты/cooldowns источников отдельные.
+Первый срез уже работает: `POST /imports/hinamizawa/{id}`, один HTTP import с
+ожиданием результата, source observations в `beatmap_sources`. Будущего batch 202
+endpoint/очереди пока нет. Контракт: `docs/architecture/mirror-import.md`.
 
 ## Команды из корня
 

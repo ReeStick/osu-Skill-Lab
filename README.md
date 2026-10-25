@@ -11,6 +11,7 @@ difficulty или PP и будут развиваться отдельно.
 загруженный файл и разобранные объекты используются только в памяти.
 Skill profile, турнирные слоты и надёжная очередь заданий — следующие этапы.
 В M1a добавлена явная сверка загруженной карты с metadata osu! API по checksum.
+Первый срез M2 добавил raw import из Hinamizawa и отдельное хранение происхождения файла.
 
 На M0 проверены установка из lock, 25 тестов (включая PostgreSQL), Ruff,
 mypy, миграции и запуск Docker API. Подробности и реальные неудачные попытки —
@@ -80,6 +81,23 @@ claimed IDs. Метаданные файла остаются прежними; 
 Живая авторизованная проверка выполнена: checksum совпал, повторная сверка
 переиспользовала cache, GET вернул сохранённые metadata.
 Текущий сценарий использует загруженный `.osu`; архивы через API не скачиваются.
+
+## Импорт одной карты из Hinamizawa
+
+```powershell
+Invoke-RestMethod -Method Post http://localhost:8000/imports/hinamizawa/1960574
+```
+
+Укажите beatmap ID отдельной difficulty. Endpoint получает metadata и raw `.osu`
+без медиа, проверяет MD5, выполняет локальный CPU-анализ и сохраняет result/source
+атомарно. Ответ — 201 или 200 при переиспользовании. `beatmap.sources` содержит
+provider, версии адаптера, checksum и времена наблюдений. Официальная сверка
+в `beatmap.osu` остаётся независимой. Опциональный `expected_sha256` фиксирует bytes.
+
+Сценарий пока ждёт результат в HTTP. Долговечные batch jobs/worker ещё не реализованы.
+Контракт и ограничения: [mirror-import](docs/architecture/mirror-import.md).
+Живая загрузка одной `.osu` 112 844 bytes и повтор/GET проверены:
+[devlog M2](docs/devlog/2026-10-25-hinamizawa-import.md).
 
 ## Извлечение .osu из локальных .osz
 
@@ -202,6 +220,7 @@ uv run --locked alembic check
 Начальная ревизия `0001_foundation` создаёт только историю Alembic;
 `0002_compact_analysis` добавляет `beatmap_inputs` и `analysis_results`,
 `0003_osu_metadata` — `osu_beatmap_matches` для выбранной внешней metadata.
+`0004_sources` добавляет `beatmap_sources` с версионируемыми download observations.
 При добавлении моделей импортируйте их в `migrations/env.py`, создавайте
 `uv run --locked alembic revision --autogenerate -m "description"` и проверяйте SQL
 и downgrade вручную. `create_all()` при старте API не используется.
@@ -225,9 +244,9 @@ docs/articles/          source material for future technical publications
 
 Следующие шаги и ограничения: [TASKS.md](TASKS.md), [ROADMAP.md](ROADMAP.md).
 M1a — osu! API metadata/identity завершён с живой OAuth-проверкой.
-Следующий этап — M2: [пакетный импорт через зеркала](docs/architecture/batch-import.md)
-с очередью и результатами по каждой карте. Сейчас это проект; runtime downloader
-и batch endpoint ещё не реализованы.
+Текущий этап — M2: [пакетный импорт через зеркала](docs/architecture/batch-import.md)
+с очередью и результатами по каждой карте. Adapter/single-file import и provenance
+уже работают; durable batch endpoint/jobs/worker — следующий срез.
 Для дальнейших метрик принят [контракт эволюции](docs/architecture/metric-evolution.md):
 официальный difficulty/pp — первая основа, точные версии вычислителей и отдельные
 семейства результатов; собственные показатели добавляются позднее.

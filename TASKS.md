@@ -3,7 +3,22 @@
 **Milestone 0 — Project Foundation завершён** (2026-10-25).
 **Milestone 1 — Beatmap Analysis MVP завершён** (2026-10-25).
 **M1a — osu! API metadata/identity завершён** (2026-10-25), включая живую OAuth-сверку.
-Следующий этап — M2 с очередью; пока не начат.
+Текущий этап — M2: готов первый срез Hinamizawa import/provenance;
+долговечные batch jobs и очередь ещё впереди.
+
+## Последний срез M2 — рабочий mirror import
+
+- [x] ID-only batch metadata adapter: до 100 ID, dedup и полный partition response.
+- [x] Bounded raw `.osu`, checksum pin, mode/encoding/body checks и source cooldown.
+- [x] `POST /imports/hinamizawa/{id}`, 201/200 и get/list с отдельным source DTO.
+- [x] `beatmap_sources` + Alembic `0004_sources`, atomic save и versioned observations.
+- [x] Fresh known official checksum проверяется до download; mirror не создаёт official match.
+- [x] 111 уникальных целевых cases проверены несколькими прогонами; независимые unit пропущены.
+- [x] Docker и живой import одной `.osu` 112 844 bytes; SHA pin совпал, analysis №1 переиспользован.
+- [ ] Durable batch/items/jobs, RabbitMQ/worker, staging/retry и общий provider budget.
+
+Контракт: [mirror-import](docs/architecture/mirror-import.md).
+Проверки: [devlog](docs/devlog/2026-10-25-hinamizawa-import.md).
 
 ## Уточнение M2 — пакетный импорт через зеркала
 
@@ -14,7 +29,8 @@
 - [x] Принят ADR-0006: sources/provenance, отдельные cooldowns, partial items и staging.
 - [x] Пункт 6 ADR-0005 частично заменён: mirror разрешён как самостоятельный источник,
   текущий официальный OAuth/verify-osu на него не перенаправляется.
-- [ ] Реализовать M2 batch endpoint, download adapter, durable jobs и worker.
+- [x] Реализовать download adapter и HTTP import одной difficulty.
+- [ ] Реализовать M2 batch endpoint, durable jobs и worker.
 
 Проект: [batch-import](docs/architecture/batch-import.md).
 Проверки: [devlog](docs/devlog/2026-10-25-mirror-batch-plan.md).
@@ -149,15 +165,13 @@ On-demand file import выделяется отдельно после пров�
 
 ## После M1a — задачи M2
 
-1. Реализовать Hinamizawa adapter: batch metadata, bounded raw `.osu`, ошибки
-   missing/unresolved и provider cooldown. Сохранить provenance до первого mirror input.
-2. Определить batch/items/AnalysisJob, состояния и временный staging; добавить
+1. Определить batch/items/AnalysisJob, состояния и временный staging; добавить
    `POST /analysis-batches` и получение прогресса/результата по каждому элементу.
-3. Принять ADR RabbitMQ delivery/ack/retry, отдельного worker и атомарной постановки.
+2. Принять ADR RabbitMQ delivery/ack/retry, отдельного worker и атомарной постановки.
    Подтверждать HTTP acceptance только после долговечного сохранения задания.
-4. Проверить частичный batch, повторную доставку, падение worker, checksum mismatch,
+3. Проверить частичный batch, повторную доставку, падение worker, checksum mismatch,
    отсутствие/ограничения upstream, очистку staging и отсутствие дубликатов.
-5. Сохранить version/config/input identity и ограничение постоянного хранения;
+4. Сохранить version/config/input identity и ограничение постоянного хранения;
    после retry staging очищается, parsed objects не переносятся в PostgreSQL.
 
 До gameplay-признаков M3 нужны effective timing/SV, slider traversal,
@@ -175,8 +189,8 @@ On-demand file import выделяется отдельно после пров�
 - Нет долговечной очереди и автоматического восстановления сломанного process pool:
   `BrokenProcessPool` даёт 503 до перезапуска экземпляра API. Состояния/retry — M2.
 - Повтор upload может заново выполнить CPU-расчёт; дедуплицируется сохранение.
-- Живая checksum-сверка подтверждена для одной карты корпуса; массовый API-прогон
-  не выполнялся. Download исходника не реализован.
+- Живая official checksum-сверка и mirror download подтверждены для одной карты;
+  массовый batch API и долговечный импорт пока не реализованы.
 - Pacing/cache/cooldown пока локальны одному API-процессу; общий client ID при
   масштабировании потребует распределённого бюджета запросов.
 - После освобождения входа новый анализ требует повторного upload точных байтов;

@@ -3,6 +3,7 @@ import logging
 from collections.abc import AsyncIterable
 from concurrent.futures import Executor
 from concurrent.futures.process import BrokenProcessPool
+from datetime import datetime
 
 from asyncpg import PostgresError
 from sqlalchemy.exc import SQLAlchemyError
@@ -14,7 +15,8 @@ from osu_skill_lab.application.preparation import (
     PreparedAnalysis,
     prepare_analysis,
 )
-from osu_skill_lab.infrastructure import analysis_repository
+from osu_skill_lab.application.sources import SourceReceipt
+from osu_skill_lab.infrastructure import analysis_repository, source_repository
 from osu_skill_lab.infrastructure.database import Database
 
 logger = logging.getLogger(__name__)
@@ -47,7 +49,12 @@ class AnalysisService:
         for _ in range(max_in_flight):
             self._tokens.put_nowait(None)
 
-    async def analyze_stream(self, chunks: AsyncIterable[bytes]) -> SaveAnalysisOutcome:
+    async def analyze_stream(
+        self,
+        chunks: AsyncIterable[bytes],
+        *,
+        source: SourceReceipt | None = None,
+    ) -> SaveAnalysisOutcome:
         try:
             self._tokens.get_nowait()
         except asyncio.QueueEmpty:
@@ -89,9 +96,27 @@ class AnalysisService:
                 raise AnalysisInputError(
                     prepared.code, prepared.message, prepared.section, prepared.line_number
                 )
+            if source is not None and (
+                prepared.source_sha256 != source.source_sha256
+                or prepared.source_md5 != source.source_md5
+                or prepared.metadata.beatmap_id not in {None, source.requested_beatmap_id}
+                or prepared.metadata.beatmap_set_id not in {None, source.metadata_beatmap_set_id}
+            ):
+                raise AnalysisInputError(
+                    "source_identity_mismatch", "Downloaded input identity does not match"
+                )
             try:
                 async with self.database.session() as session, session.begin():
-                    return await analysis_repository.save_analysis(session, prepared)
+                    outcome = await analysis_repository.save_analysis(session, prepared)
+                    if source is None:
+                        return outcome
+                    await source_repository.save_source(
+                        session, outcome.record.beatmap.input_id, source
+                    )
+                    record = await analysis_repository.get_analysis(session, outcome.record.id)
+                    if record is None:
+                        raise RuntimeError("Saved source analysis is not visible")
+                    return SaveAnalysisOutcome(record, outcome.created)
             except (SQLAlchemyError, PostgresError, OSError, TimeoutError) as exc:
                 logger.warning("Analysis persistence unavailable (%s)", type(exc).__name__)
                 raise AnalysisUnavailableError("Analysis persistence unavailable") from None
@@ -104,6 +129,14 @@ class AnalysisService:
         try:
             async with self.database.session() as session:
                 return await analysis_repository.get_analysis(session, analysis_id)
+        except (SQLAlchemyError, PostgresError, OSError, TimeoutError) as exc:
+            logger.warning("Analysis persistence unavailable (%s)", type(exc).__name__)
+            raise AnalysisUnavailableError("Analysis persistence unavailable") from None
+
+    async def recent_official_md5(self, beatmap_id: int, since: datetime) -> str | None:
+        try:
+            async with self.database.session() as session:
+                return await source_repository.recent_official_md5(session, beatmap_id, since)
         except (SQLAlchemyError, PostgresError, OSError, TimeoutError) as exc:
             logger.warning("Analysis persistence unavailable (%s)", type(exc).__name__)
             raise AnalysisUnavailableError("Analysis persistence unavailable") from None

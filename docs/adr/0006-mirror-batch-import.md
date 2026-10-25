@@ -55,6 +55,10 @@ Supersedes: decision 6 of ADR-0005
 job delivery/retry и общий provider budget; одного списка URLs недостаточно.
 Hinamizawa — проверенный по документации кандидат, живой download ещё не выполнен.
 
+Implementation note, 2026-10-25: первый срез реализовал adapter, single-file HTTP
+import и versioned provenance. Проверен один живой raw file; durable batch/worker
+по-прежнему впереди. Контракт: [mirror-import](../architecture/mirror-import.md).
+
 ## Revisit conditions
 
 Рабочий adapter/OpenAPI contract, изменившиеся условия provider, измеренная

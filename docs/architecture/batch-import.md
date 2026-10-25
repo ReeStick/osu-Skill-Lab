@@ -1,6 +1,6 @@
 # Пакетный импорт карт из зеркал
 
-Status: Accepted design; runtime not implemented
+Status: Accepted design; adapter/single-file import implemented, durable batch not implemented
 Date: 2026-10-25
 
 ## Проверенный контракт кандидата
@@ -105,4 +105,6 @@ bounded responses и User-Agent проекта. Allowlist hosts/redirect policy 
 - [Official API terms](https://osu.ppy.sh/docs/).
 
 Решение: [ADR-0006](../adr/0006-mirror-batch-import.md).
-Пока изменён план M2; downloader, batch endpoint и новые таблицы не реализованы.
+Первый срез реализован: metadata adapter, raw single-file import и `beatmap_sources`.
+Контракт: [mirror-import](mirror-import.md). Durable batch endpoint/jobs/queue
+ещё не реализованы; схема выше описывает целевой полный сценарий M2.

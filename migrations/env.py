@@ -12,6 +12,7 @@ from osu_skill_lab.infrastructure.database import Base
 from osu_skill_lab.infrastructure.models import (  # noqa: F401
     AnalysisResult,
     BeatmapInput,
+    BeatmapSource,
     OsuBeatmapMatch,
 )
 

@@ -14,11 +14,16 @@ from osu_skill_lab.application.contracts import (
 )
 from osu_skill_lab.application.osu_metadata import OsuMetadata
 from osu_skill_lab.application.preparation import PreparedAnalysis
+from osu_skill_lab.application.sources import SourceObservation
+from osu_skill_lab.infrastructure import source_repository
 from osu_skill_lab.infrastructure.models import AnalysisResult, BeatmapInput, OsuBeatmapMatch
 
 
 def _record(
-    result: AnalysisResult, source: BeatmapInput, match: OsuBeatmapMatch | None
+    result: AnalysisResult,
+    source: BeatmapInput,
+    match: OsuBeatmapMatch | None,
+    sources: tuple[SourceObservation, ...] = (),
 ) -> AnalysisRecord:
     metadata = (
         OsuMetadata(
@@ -67,6 +72,7 @@ def _record(
                 )
                 else None
             ),
+            sources,
         ),
         result.algorithm_version,
         result.parser_version,
@@ -93,7 +99,10 @@ async def get_analysis(session: AsyncSession, analysis_id: int) -> AnalysisRecor
             .where(AnalysisResult.id == analysis_id)
         )
     ).one_or_none()
-    return _record(*row) if row is not None else None
+    if row is None:
+        return None
+    sources = await source_repository.list_sources(session, [row[1].id])
+    return _record(row[0], row[1], row[2], sources=sources.get(row[1].id, ()))
 
 
 async def list_analyses(
@@ -109,7 +118,12 @@ async def list_analyses(
     if claimed_beatmap_id is not None:
         query = query.where(BeatmapInput.claimed_beatmap_id == claimed_beatmap_id)
     rows = (await session.execute(query.order_by(AnalysisResult.id).limit(limit + 1))).all()
-    items = tuple(_record(*row) for row in rows[:limit])
+    sources = await source_repository.list_sources(
+        session, list({row[1].id for row in rows[:limit]})
+    )
+    items = tuple(
+        _record(row[0], row[1], row[2], sources=sources.get(row[1].id, ())) for row in rows[:limit]
+    )
     return AnalysisPage(items, items[-1].id if len(rows) > limit else None)
 
 

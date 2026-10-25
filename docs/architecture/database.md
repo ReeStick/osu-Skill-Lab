@@ -7,6 +7,8 @@ PostgreSQL 17, SQLAlchemy 2.0 async с asyncpg, Alembic через `run_sync`.
 создаёт две предметные таблицы: `beatmap_inputs` и `analysis_results`.
 Ревизия `0003_osu_metadata` добавляет третью — `osu_beatmap_matches` для
 отдельного кеша metadata, полученной при явной сверке с сайтом.
+Ревизия `0004_sources` добавляет четвёртую — `beatmap_sources`: происхождение
+download bytes и версии metadata adapter, отдельно от официального API match.
 Решение о временном входе и компактных результатах:
 [ADR-0003](../adr/0003-transient-inputs-compact-results.md).
 
@@ -73,6 +75,25 @@ Analysis query использует LEFT JOIN, поэтому отсутстви
 доступность raw результатов. Positive cache в БД действует по `fetched_at`
 и TTL; GET читает даже старое наблюдение со временем, refresh выполняется явно.
 Подробности: [osu-api](osu-api.md), [ADR-0005](../adr/0005-osu-checksum-metadata.md).
+
+## Download observations: beatmap_sources
+
+Связь many-to-one с input через `ON DELETE RESTRICT`. Уникален ключ
+`(input_id, provider, requested_beatmap_id, adapter_version, metadata_schema_version)`.
+Новая версия adapter/schema остаётся отдельным observation; в одной комбинации
+более свежий `file_fetched_at` может обновить запись. Это не полный журнал попыток.
+
+Столбцы: provider (пока CHECK hinamizawa), requested map ID, metadata set ID,
+16-байтовый metadata MD5, adapter/schema versions, metadata last_updated/fetched_at,
+file_fetched_at, nullable metadata/file source layers, freshness и ETag. Строки
+bounded; нет JSON, raw bytes, media paths или object arrays. SHA-256 уже есть в input.
+
+Application/repository проверяют receipt против hashes и file claims input;
+source и новый analysis сохраняются одной транзакцией. Source constraint failure
+откатывает input/result. По requested ID есть неуникальный индекс; разные bytes
+с одним ID не объединяются. GET/list группируют source observations отдельно,
+не умножая строки пагинации. Mirror source не меняет статус официальной сверки.
+Контракт: [mirror-import](mirror-import.md).
 
 ## Результаты: analysis_results
 
@@ -143,7 +164,7 @@ Reader и вычисления завершаются до открытия тр
 выполнение CPU-расчёта: конкуренты могут независимо посчитать одинаковые
 признаки. Поле `created` в результате сохранения означает новую строку анализа.
 Надёжная очередь, retry/lease/outbox и долговечные состояния заданий относятся
-к следующему milestone и здесь не реализованы.
+к следующему срезу M2 и здесь не реализованы.
 
 ## Повторный анализ после освобождения входа
 
@@ -154,7 +175,8 @@ Checksum, metadata и версии позволяют проверить про�
 гарантируется. Поэтому повторяемость расчёта требует одновременно прежнего
 исходника, соответствующего кода, reader и конфигурации.
 
-Текущий HTTP-сервис не обещает повтор анализа без нового upload. Жизненный
+Повтор анализа требует нового получения bytes: upload или mirror import с SHA-256
+pin прежнего input. Доступность точной редакции у зеркала не гарантируется. Жизненный
 цикл ограничен обработкой в памяти; это не обещание криптографического
 стирания RAM или немедленной остановки уже запущенного процесса при отмене
 HTTP-запроса. Если позднее worker потребует staging на диске, срок хранения,
@@ -188,8 +210,8 @@ SQLite и `create_all()` эти проверки не подменяют.
 Контракт: [metric-evolution](metric-evolution.md),
 [ADR-0004](../adr/0004-versioned-metric-families.md).
 
-Для M2 mirror imports потребуется отдельный provenance contract перед первым
-сохранением таких входов. Download provider и официальный checksum verification
+В первом срезе M2 provenance уже реализован в `beatmap_sources`.
+Download provider и официальный checksum verification
 не взаимозаменяемы; `osu_beatmap_matches` не принимает mirror metadata как данные
-официального API. Таблицы batch/jobs/source observations пока не созданы.
+официального API. Таблицы durable batch/jobs пока не созданы.
 Проект: [batch-import](batch-import.md).
