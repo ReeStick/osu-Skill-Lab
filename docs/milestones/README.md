@@ -5,6 +5,6 @@
 - [M0 — Project Foundation](000-foundation.md).
 - [M1 — Beatmap Analysis MVP](001-analysis-mvp.md) — завершён: transient upload,
   измерения в CPU-процессах и компактные сохранённые результаты через REST.
-- [M1a — osu! API metadata/identity](001a-osu-api.md): реализация проверена локально,
-  живая OAuth-проверка ожидает credentials.
+- [M1a — osu! API metadata/identity](001a-osu-api.md): завершён с локальными
+  тестами и живой OAuth-сверкой одной карты.
 - Остальные этапы пока только в [ROADMAP](../../ROADMAP.md).

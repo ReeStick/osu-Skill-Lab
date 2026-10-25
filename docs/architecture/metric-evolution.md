@@ -117,8 +117,8 @@ lookup, checksum verification, раздельное хранение file claims
 Очередь/retry/staging — M2. Подключение difficulty engine и сопоставление метрик —
 первый срез M3, затем собственные признаки. Сейчас добавлены OAuth-адаптер,
 явная checksum-сверка и metadata cache, но не quantitative attributes или новый
-difficulty/pp engine. Контракт: [osu-api](osu-api.md). Живой авторизованный запрос
-пока не выполнен из-за отсутствия локальных credentials.
+difficulty/pp engine. Контракт: [osu-api](osu-api.md). Живая авторизованная
+checksum-сверка и переиспользование metadata проверены на одной карте.
 
 ## Проверенные источники, 2026-10-25
 
@@ -133,4 +133,4 @@ difficulty/pp engine. Контракт: [osu-api](osu-api.md). Живой авт
   отделяет wrapper от underlying engine. Это кандидат, не уже выбранная зависимость.
 - [osu! API v2](https://osu.ppy.sh/docs/): lookup, beatmap metadata, difficulty
   attributes, OAuth и правила использования. Metadata adapter реализован и
-  проверен локально; авторизованная проверка с настоящим сайтом ещё не выполнена.
+  проверен локально и живой авторизованной checksum-сверкой одной карты.

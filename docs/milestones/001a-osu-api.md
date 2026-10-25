@@ -1,7 +1,8 @@
 # M1a — osu! API metadata/identity
 
-Status: In progress — implemented and verified locally; live OAuth check pending
+Status: Complete
 Started: 2026-10-25
+Completed: 2026-10-25
 
 ## Критерии
 
@@ -15,10 +16,12 @@ Started: 2026-10-25
 - [x] 259 tests passed, quality/lock и Docker smoke без OAuth credentials.
 - [x] Download/attributes boundaries проверены: archive lazer route не используется;
   текущий file input — локальный upload, quantitative attributes — будущий сценарий.
-- [ ] Выполнить одну авторизованную сверку с настоящим osu! после настройки `.env`.
+- [x] Живая авторизованная сверка с настоящим osu!: анализ №1 → beatmap 1960574,
+  HTTP 200; повтор и GET подтвердили сохранённую metadata и прежние features.
 
-Реализация готова для настройки; доступность настоящего API не подтверждается
-synthetic transport. M2 не начат. On-demand file source требует отдельной проверки.
+Реализация проверена локально и одним авторизованным обращением к сайту после
+настройки credentials пользователем. M2 не начат. On-demand file source требует
+отдельной проверки. При живой проверке неизменённые unit-тесты не перезапускались.
 Контракт: [osu-api](../architecture/osu-api.md),
 решение: [ADR-0005](../adr/0005-osu-checksum-metadata.md),
 проверки: [devlog](../devlog/2026-10-25-osu-api-verification.md).

@@ -77,7 +77,8 @@ claimed IDs. Метаданные файла остаются прежними; 
 
 Есть OAuth token cache, TTL/cache в БД, pacing и обработка rate limit/timeout.
 Подробный контракт и настройка: [osu-api](docs/architecture/osu-api.md).
-Живая авторизованная проверка пока не выполнена: локальные credentials не заданы.
+Живая авторизованная проверка выполнена: checksum совпал, повторная сверка
+переиспользовала cache, GET вернул сохранённые metadata.
 Текущий сценарий использует загруженный `.osu`; архивы через API не скачиваются.
 
 ## Извлечение .osu из локальных .osz
@@ -223,8 +224,8 @@ docs/articles/          source material for future technical publications
 ```
 
 Следующие шаги и ограничения: [TASKS.md](TASKS.md), [ROADMAP.md](ROADMAP.md).
-Текущий срез — osu! API metadata/identity; локальная реализация проверена,
-живая OAuth-проверка ожидает credentials. Затем M2 с очередью.
+M1a — osu! API metadata/identity завершён с живой OAuth-проверкой.
+Следующий этап — M2 с очередью.
 Для дальнейших метрик принят [контракт эволюции](docs/architecture/metric-evolution.md):
 официальный difficulty/pp — первая основа, точные версии вычислителей и отдельные
 семейства результатов; собственные показатели добавляются позднее.
