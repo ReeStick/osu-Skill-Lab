@@ -30,6 +30,7 @@ uv run --locked ruff check .
 uv run --locked ruff format --check .
 uv run --locked mypy
 uv run --locked pytest
+uv run --locked osu-skill-lab extract-osz tests/unlabeled_osu_maps
 docker compose up --build --wait api
 ```
 

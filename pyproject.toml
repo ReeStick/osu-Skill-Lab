@@ -18,6 +18,9 @@ dependencies = [
     "uvicorn>=0.34,<1",
 ]
 
+[project.scripts]
+osu-skill-lab = "osu_skill_lab.cli:entrypoint"
+
 [dependency-groups]
 dev = [
     "asyncpg-stubs>=0.30,<1",
