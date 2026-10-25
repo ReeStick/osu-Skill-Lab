@@ -3,6 +3,9 @@
 Status: Accepted
 Date: 2026-10-25
 
+Decision 6 superseded by [ADR-0006](0006-mirror-batch-import.md): mirror допускается
+как самостоятельный источник для M2; остальные решения M1a сохраняют силу.
+
 ## Context
 
 После M1 имеются точные input digests и непроверенные IDs файла. M1a должен

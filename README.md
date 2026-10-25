@@ -225,7 +225,9 @@ docs/articles/          source material for future technical publications
 
 Следующие шаги и ограничения: [TASKS.md](TASKS.md), [ROADMAP.md](ROADMAP.md).
 M1a — osu! API metadata/identity завершён с живой OAuth-проверкой.
-Следующий этап — M2 с очередью.
+Следующий этап — M2: [пакетный импорт через зеркала](docs/architecture/batch-import.md)
+с очередью и результатами по каждой карте. Сейчас это проект; runtime downloader
+и batch endpoint ещё не реализованы.
 Для дальнейших метрик принят [контракт эволюции](docs/architecture/metric-evolution.md):
 официальный difficulty/pp — первая основа, точные версии вычислителей и отдельные
 семейства результатов; собственные показатели добавляются позднее.

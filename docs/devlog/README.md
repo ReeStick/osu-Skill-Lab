@@ -11,6 +11,7 @@
 - [2026-10-25 — Компактное хранение и REST-анализ](2026-10-25-compact-analysis-pipeline.md).
 - [2026-10-25 — Эволюция метрик и подготовка osu! API](2026-10-25-metric-evolution-plan.md).
 - [2026-10-25 — OAuth и сверка checksum с osu! API](2026-10-25-osu-api-verification.md).
+- [2026-10-25 — План batch import через зеркала](2026-10-25-mirror-batch-plan.md).
 
 ## Шаблон
 

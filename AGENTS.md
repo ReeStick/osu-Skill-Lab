@@ -52,6 +52,10 @@ OAuth responses или `docker compose config` с секретами. Нет eag
 Лимиты HTTP/cache действуют на один процесс: перед масштабированием нужен общий
 бюджет запросов. Контракт и ограничения download: `docs/architecture/osu-api.md`.
 
+Первый прикладной сценарий M2 — batch import через явно выбранные sources.
+Проект: `docs/architecture/batch-import.md`, ADR-0006. Mirror metadata/download
+не подменяют официальный `verify-osu`; бюджеты/cooldowns источников отдельные.
+
 ## Команды из корня
 
 ```text

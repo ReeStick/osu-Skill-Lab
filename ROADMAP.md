@@ -7,7 +7,7 @@
 | 0 — Project Foundation | Установка по lock, API, реальная БД, миграции, тесты, CI, документация | Завершён 2026-10-25; CI настроен, удалённо не запускался |
 | 1 — Beatmap Analysis MVP | Локальная `.osu` → проверка входа → измеряемые признаки → сохранённый результат через REST | Завершён 2026-10-25; вход временный, metadata и результаты постоянные |
 | 1a — osu! API integration | Metadata/identity загруженной карты, checksum verification, OAuth, cache/rate limits | Завершён 2026-10-25; живая сверка и повторное чтение проверены |
-| 2 — Background Processing | RabbitMQ, отдельный worker, состояния, retry, идемпотентность, версии | Не начат |
+| 2 — Batch Import & Background Processing | Пакет ID → mirror metadata/raw files → RabbitMQ/worker → результаты по каждому элементу; retry и временные исходники | Сценарий спроектирован; реализация не начата |
 | 3 — Feature Engineering | Сначала versioned osu! difficulty engine и upstream метрики, затем собственные определения, тесты и сегменты | Не начат; контракт эволюции принят в ADR-0004 |
 | 4 — Skill Classification | Размеченный набор, baseline, оценка ошибок и ограничений; ML только при достаточных данных | Не начат |
 | 5 — Tournament Pool Classification | Контекст турнира, multi-label слоты, история разметки, поиск | Не начат |
@@ -28,9 +28,17 @@ NumPy, SciPy, rosu-pp-py, HTTPX в runtime, RabbitMQ и Redis добавляют
 Локальные `.osu` поддержаны; M1a добавил явную checksum-сверку с metadata API v2.
 Живая авторизованная сверка одной карты и переиспользование metadata проверены.
 Download `.osz` в документации помечен lazer и недоступен обычному client credentials
-grant. On-demand file import требует отдельного проверенного источника;
-текущий законченный сценарий использует локальный upload.
+grant. Для M2 выбран кандидат Hinamizawa: batch metadata и отдельные raw `.osu`.
+Контракт проверен по документации, download adapter пока отсутствует.
+Текущий законченный сценарий использует локальный upload.
 Контракт: [osu-api](docs/architecture/osu-api.md).
+
+Предложение владельца превращает M2 в прикладной batch-сценарий: durable items,
+частичный успех и bounded загрузки вместо привязки всего пакета к HTTP-запросу.
+Mirror fallback сохраняет provider provenance и официальный cooldown по 429.
+Проект: [batch-import](docs/architecture/batch-import.md),
+решение: [ADR-0006](docs/adr/0006-mirror-batch-import.md),
+критерии: [M2](docs/milestones/002-batch-background.md).
 
 Уточнение владельца на M1: постоянно хранятся только metadata и результаты,
 исходник существует во время обработки. Для M2 потребуется определить временный

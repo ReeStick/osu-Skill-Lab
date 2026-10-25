@@ -187,3 +187,9 @@ SQLite и `create_all()` эти проверки не подменяют.
 Эти таблицы/поля пока не созданы; текущий runtime хранит только `basic-raw/1`.
 Контракт: [metric-evolution](metric-evolution.md),
 [ADR-0004](../adr/0004-versioned-metric-families.md).
+
+Для M2 mirror imports потребуется отдельный provenance contract перед первым
+сохранением таких входов. Download provider и официальный checksum verification
+не взаимозаменяемы; `osu_beatmap_matches` не принимает mirror metadata как данные
+официального API. Таблицы batch/jobs/source observations пока не созданы.
+Проект: [batch-import](batch-import.md).

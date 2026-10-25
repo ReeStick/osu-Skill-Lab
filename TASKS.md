@@ -5,6 +5,20 @@
 **M1a — osu! API metadata/identity завершён** (2026-10-25), включая живую OAuth-сверку.
 Следующий этап — M2 с очередью; пока не начат.
 
+## Уточнение M2 — пакетный импорт через зеркала
+
+- [x] Предложение владельца: batch input и дополнительный mirror source при official 429.
+- [x] Проверены Hinamizawa metadata/raw/download/pack/rate-limit contracts.
+- [x] Batch lookup до 100 ID/MD5 возвращает metadata; произвольный список raw files
+  получается ограниченными отдельными запросами, не одним upstream batch body.
+- [x] Принят ADR-0006: sources/provenance, отдельные cooldowns, partial items и staging.
+- [x] Пункт 6 ADR-0005 частично заменён: mirror разрешён как самостоятельный источник,
+  текущий официальный OAuth/verify-osu на него не перенаправляется.
+- [ ] Реализовать M2 batch endpoint, download adapter, durable jobs и worker.
+
+Проект: [batch-import](docs/architecture/batch-import.md).
+Проверки: [devlog](docs/devlog/2026-10-25-mirror-batch-plan.md).
+
 ## Последний срез M1a — явная сверка с osu! API
 
 - [x] Optional OAuth client credentials/public, tokens в RAM, парные настройки и Compose.
@@ -135,12 +149,16 @@ On-demand file import выделяется отдельно после пров�
 
 ## После M1a — задачи M2
 
-1. Определить AnalysisJob, состояния и жизненный цикл временного staging:
-   вход должен оставаться доступным до завершения допустимых retry, затем очищаться.
-2. Принять ADR RabbitMQ delivery/ack/retry, отдельного worker и атомарной постановки задания.
-3. Проверить повторную доставку, падение worker и частично завершённые операции.
-4. Сохранить version/config/input identity и ограничение постоянного хранения;
-   задачи и транспорт не должны переносить весь parsed object graph в PostgreSQL.
+1. Реализовать Hinamizawa adapter: batch metadata, bounded raw `.osu`, ошибки
+   missing/unresolved и provider cooldown. Сохранить provenance до первого mirror input.
+2. Определить batch/items/AnalysisJob, состояния и временный staging; добавить
+   `POST /analysis-batches` и получение прогресса/результата по каждому элементу.
+3. Принять ADR RabbitMQ delivery/ack/retry, отдельного worker и атомарной постановки.
+   Подтверждать HTTP acceptance только после долговечного сохранения задания.
+4. Проверить частичный batch, повторную доставку, падение worker, checksum mismatch,
+   отсутствие/ограничения upstream, очистку staging и отсутствие дубликатов.
+5. Сохранить version/config/input identity и ограничение постоянного хранения;
+   после retry staging очищается, parsed objects не переносятся в PostgreSQL.
 
 До gameplay-признаков M3 нужны effective timing/SV, slider traversal,
 нормализация координат, stacking и mods; текущие измерения намеренно raw.

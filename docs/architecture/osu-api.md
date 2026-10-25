@@ -126,9 +126,11 @@ analysis service. Сетевые/validation ошибки не возвращаю
 
 Текущий сценарий получает metadata для локального upload; `.osz` не скачиваются.
 API documentation помечает download архива как `lazer`, а такие routes недоступны
-обычному client credentials grant. Это не даёт оснований подменять его download
-через сторонний mirror или обещать доступ к историческим `.osu`.
-On-demand получение файла требует отдельного проверенного источника и сценария.
+обычному client credentials grant. В M1a реализован локальный upload.
+Для M2 принят отдельный mirror provider, с собственным контрактом и provenance,
+по [ADR-0006](../adr/0006-mirror-batch-import.md). Он не является другим адресом
+официального OAuth client и не гарантирует доступность исторической редакции.
+Проект on-demand/batch сценария: [batch-import](batch-import.md).
 
 `POST /beatmaps/{beatmap}/attributes` документирован для difficulty с mods/ruleset.
 Endpoint исследован, но в этом срезе не вызывается и его значения не сохраняются.
