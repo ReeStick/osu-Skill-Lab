@@ -1,0 +1,53 @@
+name: osu-skill-lab
+
+x-app: &app
+  image: osu-skill-lab:local
+  build: .
+  environment:
+    OSU_LAB_ENVIRONMENT: ${OSU_LAB_ENVIRONMENT:-local}
+    # Host DSN from .env is intentionally replaced by the Compose service hostname.
+    OSU_LAB_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-osu_lab}:${POSTGRES_PASSWORD:-osu_lab_local}@db:5432/${POSTGRES_DB:-osu_skill_lab}
+    OSU_LAB_DATABASE_TIMEOUT_SECONDS: ${OSU_LAB_DATABASE_TIMEOUT_SECONDS:-3}
+
+services:
+  db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-osu_lab}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-osu_lab_local}
+      POSTGRES_DB: ${POSTGRES_DB:-osu_skill_lab}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  migrate:
+    <<: *app
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    <<: *app
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=5)"]
+      interval: 10s
+      timeout: 6s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  postgres_data:

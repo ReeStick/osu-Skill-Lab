@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.13.5"
+          enable-cache: true
+      - run: uv sync --locked --python 3.12
+      - run: uv run --locked ruff check .
+      - run: uv run --locked ruff format --check .
+      - run: uv run --locked mypy
+      - run: uv run --locked pytest -m "not integration"
+
+  postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-bookworm
+        env:
+          POSTGRES_USER: osu_lab
+          POSTGRES_PASSWORD: ci_local_only
+          POSTGRES_DB: osu_skill_lab_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U osu_lab -d osu_skill_lab_test"
+          --health-interval 2s --health-timeout 3s --health-retries 20
+    env:
+      OSU_LAB_DATABASE_URL: postgresql+asyncpg://osu_lab:ci_local_only@127.0.0.1:5432/osu_skill_lab_test
+      OSU_LAB_TEST_DATABASE_URL: postgresql+asyncpg://osu_lab:ci_local_only@127.0.0.1:5432/osu_skill_lab_test
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.13.5"
+          enable-cache: true
+      - run: uv sync --locked --python 3.12
+      - run: uv run --locked alembic upgrade head
+      - run: uv run --locked alembic check
+      - run: uv run --locked alembic downgrade base
+      - run: uv run --locked alembic upgrade head
+      - run: uv run --locked pytest -m integration
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: docker compose up --build --wait api
+      - run: curl --fail http://127.0.0.1:8000/health/live
+      - run: curl --fail http://127.0.0.1:8000/health/ready
+      - if: failure()
+        run: docker compose logs --no-color
+      - if: always()
+        run: docker compose down

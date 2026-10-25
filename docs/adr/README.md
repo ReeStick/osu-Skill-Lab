@@ -1,0 +1,22 @@
+# Architecture Decision Records
+
+Значимые решения фиксируются отдельно, мелкие изменения — в devlog.
+Принятое решение не переписывается задним числом: новое ADR ссылается на прежнее,
+а статус прежнего меняется на Superseded.
+
+- [0001 — Модульный монолит](0001-modular-monolith.md).
+- [0002 — PostgreSQL и async persistence](0002-postgresql-async.md).
+
+## Шаблон
+
+```markdown
+# ADR-NNNN: Название
+Status: Proposed | Accepted | Superseded
+Date: YYYY-MM-DD
+
+## Context
+## Decision
+## Alternatives
+## Consequences
+## Revisit conditions
+```

@@ -1,0 +1,6 @@
+flowchart LR
+    Client[HTTP client] --> API[FastAPI factory and lifespan]
+    API --> Health[Health routes]
+    Health --> Adapter[Async SQLAlchemy adapter]
+    Adapter --> PG[(PostgreSQL 17)]
+    Migrate[Alembic one-shot process] --> PG
