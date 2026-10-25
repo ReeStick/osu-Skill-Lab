@@ -1,6 +1,6 @@
 # Аналитический reader .osu v14
 
-Парсер читает только данные, нужные будущему анализу. Вход — `bytes`, выход —
+Парсер читает только данные, нужные анализу. Вход — `bytes`, выход —
 immutable dataclasses из `analysis/models.py`. Нет FastAPI, ORM, файлового I/O
 или обращения к ресурсам карты. Версия контракта: `osu-standard-v14/1`.
 
@@ -78,6 +78,12 @@ uv run --locked osu-skill-lab inspect-osu data/unpacked_osu_maps --recursive
 Это не duration, dominant/средний BPM или диапазон BPM только играбельного участка.
 SHA-256 считается по всем исходным байтам `.osu`, включая игнорируемый текст:
 изменение строки с видео меняет checksum, но не аналитические значения.
+
+Summary — диагностический вывод, не вход feature extraction. `POST /analyses`
+передаёт bytes reader и работает с `ParsedBeatmap` внутри CPU-процесса;
+после расчёта сохраняются компактные metadata/settings и скалярные результаты.
+Объекты и timing points в постоянное хранилище не попадают. См.
+[basic-features](basic-features.md) и [database](database.md).
 
 ## Ограничения и дальнейшие шаги
 

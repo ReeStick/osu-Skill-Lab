@@ -1,9 +1,13 @@
 import os
 from collections.abc import AsyncIterator
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
+from alembic import command
+from alembic.config import Config
 from pydantic import SecretStr
+from sqlalchemy import Connection
 from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.pool import NullPool
@@ -45,3 +49,15 @@ async def schema_engine(database_settings: Settings) -> AsyncIterator[AsyncEngin
                 await connection.execute(DropSchema(schema_name, cascade=True))
         finally:
             await admin_engine.dispose()
+
+
+@pytest.fixture
+async def migrated_engine(schema_engine: AsyncEngine) -> AsyncEngine:
+    def upgrade(connection: Connection) -> None:
+        config = Config(str(Path(__file__).resolve().parents[2] / "alembic.ini"))
+        config.attributes["connection"] = connection
+        command.upgrade(config, "head")
+
+    async with schema_engine.begin() as connection:
+        await connection.run_sync(upgrade)
+    return schema_engine

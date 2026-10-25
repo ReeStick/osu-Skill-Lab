@@ -9,12 +9,13 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from osu_skill_lab.config import Settings
 from osu_skill_lab.infrastructure.database import Base
+from osu_skill_lab.infrastructure.models import AnalysisResult, BeatmapInput  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name, disable_existing_loggers=False)
 
-# Import mapped models here when the first domain tables are implemented.
+# Import mapped models above to register metadata for autogeneration/check.
 target_metadata = Base.metadata
 
 

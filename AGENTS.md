@@ -24,6 +24,16 @@ Reader `.osu` целевой: metadata/settings, timing points и hit objects.
 до полного игрового decoder без отдельного сценария. Сырой input и effective
 gameplay values различаются; контракт в `docs/architecture/osu-parser.md`.
 
+Входные байты и массивы объектов нужны только на время расчёта. HTTP сейчас
+обрабатывает `.osu` в RAM, без файлов; в PostgreSQL сохраняются fingerprint
+входа, ограниченная metadata и versioned scalar results. Не добавляйте
+постоянное хранение исходников/объектов без нового сценария. Малый JSONB —
+только конфигурация; признаки — типизированные столбцы. IDs файла считаются
+непроверенными claims до сверки с внешним источником. См. ADR-0003 и database.md.
+Локальный исследовательский корпус `tests/unlabeled_osu_maps` и результаты
+offline extraction принадлежат пользователю; сервис не должен удалять их
+как свои временные upload-файлы.
+
 ## Команды из корня
 
 ```text

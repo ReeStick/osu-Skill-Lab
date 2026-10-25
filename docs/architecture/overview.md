@@ -1,11 +1,13 @@
 # Архитектура
 
-## Реализовано в M0
+## Реализовано в M0 и M1
 
 Модульный монолит с одним Python-пакетом. `main.create_app` — точка сборки;
 `config.Settings` валидирует окружение. `api/` содержит транспорт и зависимости,
 `infrastructure/database.py` — адаптер PostgreSQL и общую ORM metadata.
-Разделение даёт тестируемые границы без репозиториев и сервисов, у которых пока нет задачи.
+`application/` управляет обработкой входа, CPU-процессами и транзакциями;
+`analysis/` содержит независимые reader, модели и вычисления;
+`infrastructure/analysis_repository.py` сохраняет и читает компактные результаты.
 
 Пул создаётся в FastAPI lifespan без немедленного подключения и закрывается
 при завершении. У каждого запроса своя сессия, если endpoint её запрашивает.
@@ -19,13 +21,18 @@ Readiness не проверяет Alembic head. Compose запускает migra
 ```mermaid
 flowchart LR
     Client[HTTP client] --> API[FastAPI]
+    API --> Service[Application service]
+    Service --> CPU[2 CPU processes: reader + features]
+    CPU --> Compact[Compact metadata + scalar results]
+    Compact --> Repository[SQLAlchemy repository]
+    Repository --> PG[(PostgreSQL)]
     API --> Health[Health routes]
     Health --> DBAdapter[Async SQLAlchemy adapter]
-    DBAdapter --> PG[(PostgreSQL)]
+    DBAdapter --> PG
     Migration[Alembic process] --> PG
 ```
 
-## Планируемые границы
+## Обработка входа
 
 В первом срезе M1 добавлены offline `cli.py` и адаптер
 `infrastructure/osz.py` для подготовки локальных архивов, без зависимости от БД.
@@ -33,17 +40,21 @@ flowchart LR
 с независимыми моделями, reader v14 и raw summary; CLI `inspect-osu` использует
 эти функции без БД. Контракт: [osu-parser](osu-parser.md). Медиа не читаются.
 
-- `domain/`: независимые предметные модели и правила.
-- `application/`: импорт, запуск анализа, поиск; координация транзакций.
-- `analysis/` уже содержит reader; измеряемые признаки и skill algorithms будут
-  добавляться с отдельными математическими определениями и версиями.
-- `infrastructure/`: ORM, локальное файловое хранилище, затем внешние источники.
-- `workers/`: отдельные процессы обработки, позже RabbitMQ.
+REST принимает raw `.osu` до 4 MiB. Application резервирует один из двух слотов
+до чтения body. Reader и `basic-raw/1` работают через `ProcessPoolExecutor`;
+HTTP ожидает результат. При отмене запроса слот остаётся занят до завершения
+процесса. Исходные байты и массивы не пишутся на диск и не возвращаются из
+CPU-процесса: наружу выходят только компактные данные для одной транзакции.
 
-Эти пакеты будут созданы с первым рабочим сценарием. Domain и Analysis не должны
-импортировать FastAPI или SQLAlchemy. Длительные CPU-bound вычисления выполняются
-вне HTTP event loop. Надёжность фоновых заданий не обеспечивается `BackgroundTasks`;
-стратегия delivery/retry/idempotency будет принята на этапе очереди.
+В PostgreSQL две таблицы: fingerprint входа и versioned scalar result.
+Повторы защищены unique constraints; два конкурента могут выполнить расчёт,
+но сохранить один результат. Подробности: [database](database.md),
+[признаки](basic-features.md), [ADR-0003](../adr/0003-transient-inputs-compact-results.md).
+Offline extraction остаётся отдельным инструментом подготовки корпуса.
+
+`domain/` и `workers/` появятся при соответствующих сценариях. Analysis не
+импортирует FastAPI или SQLAlchemy. Надёжность фоновых заданий не обеспечивается
+`BackgroundTasks`; delivery/retry/staging будут определены на M2.
 
 ## Семантика анализа
 
@@ -51,13 +62,13 @@ flowchart LR
 2. B: skill profile — интерпретация признаков, гипотезы и ограничения.
 3. C: multi-label турнирные слоты в контексте турнира, уровня и раунда.
 
-Difficulty и PP вычисляются и хранятся отдельно. Для каждого результата потребуются
-checksum входа, mods и параметры, версия алгоритма и параметры extraction.
-Сейчас анализ отсутствует; количественные оценки качества не заявляются.
+Difficulty и PP — отдельные будущие расчёты. Текущий результат содержит checksum
+входа, версии, конфигурацию raw/no-mods и 22 измерения уровня A. Skill profile,
+качество классификации и турнирные слоты пока не вычисляются.
 
 ## Компромиссы
 
 PostgreSQL обязателен для интеграционных тестов; это сложнее in-memory SQLite,
 зато проверяет реальный драйвер, транзакции и миграции. Нет Redis, RabbitMQ и
-численных библиотек до сценария, которому они нужны. В M0 нет auth, сетевого
+численных библиотек до сценария, которому они нужны. В M1 нет auth, сетевого
 импорта и публичного развёртывания. Локальные порты доступны только loopback.

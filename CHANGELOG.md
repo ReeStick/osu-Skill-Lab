@@ -6,6 +6,13 @@
 
 ### Added
 
+- REST-анализ `.osu`: `POST /analyses`, чтение результата и список с пагинацией.
+- 22 базовых scalar features: counts, red BPM, start span, интервалы и raw
+  расстояния heads с математическим контрактом `basic-raw/1`.
+- Компактные PostgreSQL metadata/results, версии и checksums; атомарная
+  дедупликация повторных и конкурентных сохранений.
+- Ограниченная обработка входа в RAM и CPU-процессах, без сохранения файлов;
+  контролируемые ошибки размера, формата, перегрузки и доступности.
 - Аналитический reader osu!standard v14: difficulty settings, timing points,
   circles/sliders/spinners и CLI `inspect-osu` с JSON-сводками и ошибками по строкам.
 - Offline CLI `osu-skill-lab extract-osz`: ограниченное извлечение `.osu`,

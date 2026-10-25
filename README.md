@@ -4,16 +4,56 @@ Backend для воспроизводимого анализа карт osu!stan
 skill profile → контекстная классификация турнирных слотов. Эти уровни не заменяют
 difficulty или PP и будут развиваться отдельно.
 
-Реализован **Milestone 0 — Project Foundation**. Доступны FastAPI,
-проверки состояния, PostgreSQL, SQLAlchemy async, Alembic, тесты и CI.
-Начат Milestone 1: доступны локальная подготовка `.osz`, аналитический reader
-`.osu` v14 и JSON-сводки через CLI. Импорт через REST, persistence результатов,
-skill analysis и фоновые задания ещё не реализованы.
+Реализованы **M0 — Project Foundation** и **M1 — Beatmap Analysis MVP**:
+локальная подготовка `.osz`, reader `.osu` v14, расчёт 22 базовых признаков
+в отдельных процессах, REST upload и сохранение результатов в PostgreSQL.
+Постоянно хранятся компактные metadata, checksums и скалярные результаты;
+загруженный файл и разобранные объекты используются только в памяти.
+Skill profile, турнирные слоты и надёжная очередь заданий — следующие этапы.
 
 На M0 проверены установка из lock, 25 тестов (включая PostgreSQL), Ruff,
 mypy, миграции и запуск Docker API. Подробности и реальные неудачные попытки —
 в [devlog](docs/devlog/2026-10-25-project-foundation.md).
 Удалённый запуск GitHub Actions ещё не выполнялся.
+
+## Загрузка и сохранённый анализ
+
+После запуска API отправьте исходные байты одного `.osu`, без multipart:
+
+```powershell
+curl.exe --fail --header "Content-Type: application/octet-stream" --data-binary "@tests/fixtures/analytic-v14.osu" http://localhost:8000/analyses
+Invoke-RestMethod http://localhost:8000/analyses
+```
+
+В Bash используйте `curl` вместо `curl.exe`. Ответ содержит `id`, `beatmap`,
+версии алгоритма/reader, конфигурацию, исходные difficulty settings и `features`.
+
+- `POST /analyses`: `201` для нового результата, `200` для той же комбинации
+  байтов, версий и конфигурации. Повтор сохраняет прежние `id` и время создания.
+- `GET /analyses/{id}`: сохранённый результат или `404`.
+- `GET /analyses?limit=20&after_id=0`: страницы по возрастанию ID;
+  `next_after_id=null` означает конец. Допустим `limit` от 1 до 100.
+  Необязательный `claimed_beatmap_id` фильтрует IDs, заявленные в файле.
+- Максимум 4 MiB на `.osu`; больший вход — `413`, неверный формат — `422`,
+  неподходящий Content-Type — `415`. При занятых двух слотах обработки на
+  экземпляр API — `429` с `Retry-After: 1`; при недоступности БД/процессов — `503`.
+
+Это синхронный HTTP-сценарий с ожиданием CPU-процесса, без долговечной очереди.
+Он не пишет исходники на диск. Диагностический `inspect-osu` выводит сводки,
+а анализ получает реальные объекты reader в памяти. Свои локальные архивы и
+файлы команды `extract-osz` HTTP-сервис не удаляет.
+
+SHA-256 обозначает точные исходные байты, MD5 сохраняется для совместимого
+checksum lookup. IDs из upload пока не сверяются с сайтом:
+`identity_status="unverified"`. Для повторного расчёта новым алгоритмом нужно
+снова передать файл с соответствующим SHA-256; metadata не восстанавливает объекты.
+
+Определения измерений: [basic-features](docs/architecture/basic-features.md).
+Схема хранения: [database](docs/architecture/database.md), решение:
+[ADR-0003](docs/adr/0003-transient-inputs-compact-results.md).
+Последняя проверка: 196 тестов, включая 18 интеграционных с PostgreSQL,
+а также Docker API на 33 локальных картах. Детали и замер хранения —
+в [devlog M1](docs/devlog/2026-10-25-compact-analysis-pipeline.md).
 
 ## Извлечение .osu из локальных .osz
 
@@ -48,7 +88,7 @@ hit objects. Аудио, видео, фон, storyboard и samples не загр
 Поддержан osu!standard v14/UTF-8. Контракт и ограничения:
 [osu-parser](docs/architecture/osu-parser.md). Все 33 локальные карты успешно
 прочитаны; локальные сводки сохранены в `data/map-summaries.jsonl` и исключены из Git.
-Текущий unit-прогон: 126 passed. Подробности:
+На этапе reader проверены 126 unit-тестов. Подробности:
 [devlog парсера](docs/devlog/2026-10-25-analytical-osu-reader.md).
 
 ## Быстрый запуск в Docker
@@ -133,8 +173,9 @@ uv run --locked alembic current
 uv run --locked alembic check
 ```
 
-Начальная ревизия `0001_foundation` создаёт только историю Alembic. Доменных таблиц
-пока нет. При добавлении моделей импортируйте их в `migrations/env.py`, создавайте
+Начальная ревизия `0001_foundation` создаёт только историю Alembic;
+`0002_compact_analysis` добавляет `beatmap_inputs` и `analysis_results`.
+При добавлении моделей импортируйте их в `migrations/env.py`, создавайте
 `uv run --locked alembic revision --autogenerate -m "description"` и проверяйте SQL
 и downgrade вручную. `create_all()` при старте API не используется.
 Не выполняйте downgrade на ценных данных без анализа последствий.
@@ -142,10 +183,10 @@ uv run --locked alembic check
 ## Структура и история
 
 ```text
-src/osu_skill_lab/       FastAPI factory, config, CLI, api/, analysis/, infrastructure/
+src/osu_skill_lab/       factory, config, CLI, api/, application/, analysis/, infrastructure/
 migrations/             Alembic env, template, versioned revisions
-tests/unit/             reader, extraction, CLI, configuration, HTTP and lifecycle
-tests/integration/      real PostgreSQL, migrations, transactions, readiness
+tests/unit/             reader, features, extraction, CLI, HTTP, capacity and cancellation
+tests/integration/      real PostgreSQL, concurrency, migrations and full upload flow
 docs/architecture/      architecture, diagrams and current/planned data model
 docs/adr/               significant architecture decisions
 docs/devlog/            factual development history and verification results
