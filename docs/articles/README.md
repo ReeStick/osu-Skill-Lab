@@ -5,7 +5,8 @@
 | Идея | Исходный материал | Чего пока не хватает |
 | --- | --- | --- |
 | Основа анализатора на FastAPI | [M0 devlog](../devlog/2026-10-25-project-foundation.md), [ADR](../adr/README.md) | Рабочий импорт и анализ |
-| Подготовка карт из `.osz` | [Распаковка](../devlog/2026-10-25-local-osz-extraction.md), [контракт](../architecture/local-import.md) | Parser и полный сценарий импорта |
+| Подготовка карт из `.osz` | [Распаковка](../devlog/2026-10-25-local-osz-extraction.md), [контракт](../architecture/local-import.md) | Полный сценарий импорта |
+| Raw данные и игровые нормализации | [Reader devlog](../devlog/2026-10-25-analytical-osu-reader.md), [контракт](../architecture/osu-parser.md) | Effective features и сравнения с клиентом |
 | Схема версий анализа PostgreSQL | [Направление модели](../architecture/database.md) | Реальных таблиц, миграций и trade-offs |
 | Надёжные задания RabbitMQ | ROADMAP M2 | Реализации, retry/idempotency испытаний |
 | Finger control и aim features | [План исследований](../experiments/README.md) | Данных, baseline и измеренных ошибок |

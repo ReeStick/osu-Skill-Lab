@@ -7,6 +7,7 @@
 
 - [2026-10-25 — Project Foundation](2026-10-25-project-foundation.md).
 - [2026-10-25 — Локальная распаковка .osz](2026-10-25-local-osz-extraction.md).
+- [2026-10-25 — Аналитический reader .osu](2026-10-25-analytical-osu-reader.md).
 
 ## Шаблон
 

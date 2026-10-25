@@ -1,0 +1,51 @@
+osu file format v14
+
+[General]
+AudioFilename: ../missing-audio.mp3
+Mode: 0
+StackLeniency: 0.65
+
+[Metadata]
+Title: Synthetic: analytical fixture
+TitleUnicode: Synthetic Unicode
+Artist: Synthetic Artist
+ArtistUnicode: Synthetic Artist Unicode
+Creator: Fixture Author
+Version: Unit Test
+Source: Generated test data
+Tags: synthetic test
+BeatmapID: 0
+BeatmapSetID: -1
+
+[Difficulty]
+HPDrainRate: 5
+CircleSize: 4
+OverallDifficulty: 8
+ApproachRate: 9
+SliderMultiplier: 1.4
+SliderTickRate: 2
+
+[Editor]
+Ignored invalid editor content
+
+[Events]
+0,0,"missing-background.jpg",0,0
+Video,0,"missing-video.mp4"
+Sprite,Foreground,Centre,"missing-sprite.png",320,240
+ F,0,0,100,1
+2,1500,1800
+
+[Colours]
+Ignored invalid colour content
+
+[TimingPoints]
+-100,500,4,ignored,ignored,ignored,1,1
+1000,-50,4,ignored,ignored,ignored,0,0
+2000,400,3,ignored,ignored,ignored,1,0
+2000,-100,4,ignored,ignored,ignored,0,1
+
+[HitObjects]
+64,96,500,5,ignored,missing-hitsound.wav
+128,192,1000,2,0,B|160:192|160:192|192:96,2,140.5,ignored,ignored,missing.wav
+256,192,2200,8,0,2600,missing-sample.wav
+300,100,2800,1,0

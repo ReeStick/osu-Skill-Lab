@@ -1,7 +1,8 @@
 # Локальная подготовка .osz
 
 Первый законченный срез M1 — извлечение `.osu` из локальных архивов.
-Это CLI-операция без БД и HTTP. Parser и REST import пока не реализованы.
+Это CLI-операция без БД и HTTP. Извлечённые файлы затем можно прочитать
+[аналитическим reader](osu-parser.md); REST import пока не реализован.
 
 `.osz` — ZIP-архив beatmap set; `.osu` описывает отдельную difficulty.
 Основание: [официальные форматы osu!](https://osu.ppy.sh/wiki/en/Client/File_formats).
@@ -72,7 +73,7 @@ Output root задаётся оператором и должен быть до�
 
 Распаковка сохраняет байты `.osu` и не подтверждает синтаксис, ruleset или
 корректность hit objects. Все difficulty внутри архива извлекаются; проверка
-osu!standard и формата относится к следующему parser-этапу.
+osu!standard и формата выполняет отдельный [reader](osu-parser.md).
 
 Общие причины отказов ZIP и ограничения описаны в
 [Python zipfile](https://docs.python.org/3.12/library/zipfile.html#decompression-pitfalls).

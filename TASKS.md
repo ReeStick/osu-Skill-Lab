@@ -1,10 +1,26 @@
 # Текущее состояние
 
 **Milestone 0 — Project Foundation завершён** (2026-10-25).
-Текущий этап — **Milestone 1**: завершён первый срез подготовки локальных `.osz`.
-Parser, сохранение карт/анализа и REST import ещё не реализованы.
+Текущий этап — **Milestone 1**: готовы подготовка `.osz` и аналитический reader `.osu`.
+Сохранение карт/анализа и REST import ещё не реализованы.
 
-## Текущий срез M1 — локальные архивы
+## Последний срез M1 — аналитические данные .osu
+
+- [x] Чистый reader v14/UTF-8 для osu!standard, без зависимости от ORM/FastAPI.
+- [x] Metadata/IDs, AR/OD/CS/HP, slider settings, stack leniency.
+- [x] Red/green timing points; circles, slider anchors/spans/length, spinner end.
+- [x] Медиа, samples и storyboard игнорируются; raw/effective значения разделены.
+- [x] Version/limits/checksum, ошибки по строкам, стабильная сортировка объектов.
+- [x] CLI `inspect-osu` для файла/каталога; JSON-сводки, explicit recursion.
+- [x] 70 новых тестов: 67 parser + 3 CLI. Всего 126 unit passed, 4 integration deselected.
+- [x] Ruff/format, mypy (26 файлов), актуальность lock; новых зависимостей нет.
+- [x] Все 33 карты прочитаны: 26 400 объектов и 6 377 timing points, без warnings.
+- [x] `data/map-summaries.jsonl` создан локально; в Git не включён.
+
+Контракт: [osu-parser](docs/architecture/osu-parser.md).
+История: [devlog](docs/devlog/2026-10-25-analytical-osu-reader.md).
+
+## Предыдущий срез M1 — локальные архивы
 
 - [x] CLI для одного `.osz` или каталога, без БД и HTTP.
 - [x] Ограниченное извлечение только `.osu`, CRC и SHA-256, стабильный manifest.
@@ -50,12 +66,12 @@ Parser, сохранение карт/анализа и REST import ещё не 
 
 ## Следующие задачи M1
 
-1. Определить контракт `.osu` parser: кодировки, версии, секции, режим standard,
-   ошибки и ограничения входа. Текущая распаковка синтаксис `.osu` не проверяет.
-2. Реализовать независимый parser `.osu` с небольшими синтетическими fixtures.
-3. Добавить storage abstraction и первые Beatmap/BeatmapSet модели с миграцией.
-4. Определить измеряемые базовые признаки и versioned analysis contract.
-5. Обеспечить выполнение CPU-анализа вне HTTP event loop, затем REST-сценарий M1.
+1. Добавить storage abstraction и первые Beatmap/BeatmapSet модели с миграцией:
+   внешние IDs и версии файлов по checksum не взаимозаменяемы.
+2. Определить измеряемые базовые признаки и versioned analysis contract.
+3. Определить effective timing/SV и нормализацию координат перед gameplay-признаками;
+   reader сейчас сохраняет raw значения и не воспроизводит игровой decoder.
+4. Обеспечить выполнение CPU-анализа вне HTTP event loop, затем REST-сценарий M1.
 
 ## Технический долг и открытые решения
 

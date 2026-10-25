@@ -6,6 +6,8 @@
 
 ### Added
 
+- Аналитический reader osu!standard v14: difficulty settings, timing points,
+  circles/sliders/spinners и CLI `inspect-osu` с JSON-сводками и ошибками по строкам.
 - Offline CLI `osu-skill-lab extract-osz`: ограниченное извлечение `.osu`,
   checksums и manifest, повторная проверка без перезаписи существующих результатов.
 - Основа API с `GET /health/live`, `GET /health/ready`, OpenAPI и Swagger UI.

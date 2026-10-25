@@ -6,8 +6,9 @@ difficulty или PP и будут развиваться отдельно.
 
 Реализован **Milestone 0 — Project Foundation**. Доступны FastAPI,
 проверки состояния, PostgreSQL, SQLAlchemy async, Alembic, тесты и CI.
-Начат Milestone 1: доступна локальная подготовка `.osz` через CLI.
-Parser, импорт через REST, анализ и фоновые задания ещё не реализованы.
+Начат Milestone 1: доступны локальная подготовка `.osz`, аналитический reader
+`.osu` v14 и JSON-сводки через CLI. Импорт через REST, persistence результатов,
+skill analysis и фоновые задания ещё не реализованы.
 
 На M0 проверены установка из lock, 25 тестов (включая PostgreSQL), Ruff,
 mypy, миграции и запуск Docker API. Подробности и реальные неудачные попытки —
@@ -32,6 +33,23 @@ uv run --locked osu-skill-lab extract-osz tests/unlabeled_osu_maps
 Проверки этого среза: 56 unit-тестов; на локальном корпусе извлечены и побайтово
 сверены 33 карты из 12 архивов. Итоги — в
 [devlog](docs/devlog/2026-10-25-local-osz-extraction.md).
+
+## Чтение параметров карты
+
+```powershell
+uv run --locked osu-skill-lab inspect-osu data/unpacked_osu_maps --recursive
+```
+
+Команда читает metadata, AR/OD/CS/HP, настройки слайдеров, timing points и
+hit objects. Аудио, видео, фон, storyboard и samples не загружаются.
+Результат — JSON Lines с исходными параметрами, counts и BPM extrema.
+Это исходные настройки без модификаторов; star rating и PP пока не вычисляются.
+
+Поддержан osu!standard v14/UTF-8. Контракт и ограничения:
+[osu-parser](docs/architecture/osu-parser.md). Все 33 локальные карты успешно
+прочитаны; локальные сводки сохранены в `data/map-summaries.jsonl` и исключены из Git.
+Текущий unit-прогон: 126 passed. Подробности:
+[devlog парсера](docs/devlog/2026-10-25-analytical-osu-reader.md).
 
 ## Быстрый запуск в Docker
 
@@ -124,9 +142,9 @@ uv run --locked alembic check
 ## Структура и история
 
 ```text
-src/osu_skill_lab/       FastAPI factory, config, api/, infrastructure/
+src/osu_skill_lab/       FastAPI factory, config, CLI, api/, analysis/, infrastructure/
 migrations/             Alembic env, template, versioned revisions
-tests/unit/             configuration, HTTP contracts, failures and lifecycle
+tests/unit/             reader, extraction, CLI, configuration, HTTP and lifecycle
 tests/integration/      real PostgreSQL, migrations, transactions, readiness
 docs/architecture/      architecture, diagrams and current/planned data model
 docs/adr/               significant architecture decisions

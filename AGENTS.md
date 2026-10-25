@@ -19,6 +19,11 @@ skill profile и контекстные турнирные слоты; difficult
 Длительные CPU-расчёты не выполняются в event loop HTTP. Версионируйте
 алгоритмы, параметры и входные данные; не выдавайте эвристики за измерения.
 
+Reader `.osu` целевой: metadata/settings, timing points и hit objects.
+Медиа, storyboard и hitsounds не входят в его назначение. Не расширяйте его
+до полного игрового decoder без отдельного сценария. Сырой input и effective
+gameplay values различаются; контракт в `docs/architecture/osu-parser.md`.
+
 ## Команды из корня
 
 ```text
@@ -31,6 +36,7 @@ uv run --locked ruff format --check .
 uv run --locked mypy
 uv run --locked pytest
 uv run --locked osu-skill-lab extract-osz tests/unlabeled_osu_maps
+uv run --locked osu-skill-lab inspect-osu data/unpacked_osu_maps --recursive
 docker compose up --build --wait api
 ```
 
