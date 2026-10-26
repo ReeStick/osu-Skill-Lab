@@ -4,7 +4,23 @@
 **Milestone 1 — Beatmap Analysis MVP завершён** (2026-10-25).
 **M1a — osu! API metadata/identity завершён** (2026-10-25), включая живую OAuth-сверку.
 **M2 — Batch Import & Background Processing завершён** (2026-10-26).
-Следующий этап — M3: versioned difficulty engine по ADR-0004; расчёт SR/pp ещё не реализован.
+Текущий этап — проектирование M3: versioned difficulty engine и расширяемые теги.
+Runtime SR/pp/tag registry/ML/GPU ещё не реализован.
+
+## Уточнение M3 — определения тегов и compute budget
+
+- [x] Общие difficulty/pp и компоненты, раздельные snapshots и score context обязательны.
+- [x] Каталог immutable tag definitions/bundles; методы и scope map/segment отделены от measurements.
+- [x] Typed feature families, sparse assignments и явная семантика unknown/partial coverage.
+- [x] Providers/dependencies/profile identity с будущими timing/slider geometry/ML stages.
+- [x] Мягкий target 30000 ms, отдельные queue/acquisition timings, будущие CPU/GPU capabilities.
+- [x] Сохранены временные source/tensors; модель/пороги/preprocessing требуют provenance.
+- [ ] Выбрать точную ревизию engine, проверить доступность компонентов и реализовать первый adapter/DDL.
+- [ ] Реализовать providers/tag foundation и измерить pipeline до обещаний latency/throughput.
+
+Контракт: [tag-pipeline](docs/architecture/tag-pipeline.md),
+решение: [ADR-0008](docs/adr/0008-extensible-tags-and-compute-budget.md),
+критерии: [M3](docs/milestones/003-feature-engineering.md).
 
 ## Завершение M2 — долговечные пакеты и worker
 
@@ -192,6 +208,8 @@ On-demand file import выделяется отдельно после пров�
 нормализация координат, stacking и mods; текущие измерения намеренно raw.
 Первый срез M3 — выбрать и проверить актуальный difficulty engine, реализовать
 контракт ADR-0004 и сопоставление upstream полей; затем собственные признаки.
+Подготовлен контракт tag registry/compute budget по ADR-0008. Timing/geometry tags
+получат определения и тесты; обученные ML-классификаторы не заявляются готовыми.
 
 ## Технический долг и открытые решения
 

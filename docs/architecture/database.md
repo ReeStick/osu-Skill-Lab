@@ -220,3 +220,14 @@ Download provider и официальный checksum verification
 `provider_budgets` (общий Hinamizawa pacing/cooldown). Только типизированные поля,
 без payload JSON/source bytes/object arrays. Job rows содержат последнее состояние,
 не журнал попыток. Контракт: [batch-processing](batch-processing.md).
+
+## Проект M3: измерения и теги
+
+Для M3 принята архитектура typed difficulty/performance/custom feature families
+и отдельного каталога tag definitions/bundles с реляционными assignments.
+Разреженное хранение назначений требует учитывать coverage/status run: отсутствие
+строки не означает, что тег вычислен и не назначен. Model/config/definition revisions
+не перезаписывают старые результаты. Новые теги не требуют отдельного столбца;
+новые числовые measurements вводятся миграциями в своём семействе.
+Это проект, не существующие таблицы. Поля/identity и будущие stage timings:
+[tag-pipeline](tag-pipeline.md), [ADR-0008](../adr/0008-extensible-tags-and-compute-budget.md).

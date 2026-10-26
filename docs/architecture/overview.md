@@ -97,3 +97,8 @@ Redis и численных библиотек пока нет. Нет поль�
 наших endpoints и публичного развёртывания. Внешний OAuth служит только public
 metadata lookup; Hinamizawa single-file download и durable batch работают.
 Локальные порты — loopback.
+
+M3 проектирует отдельные providers и tag definitions с versioned dependencies,
+typed results, мягким 30 s budget и будущей GPU capability. Этот pipeline/DDL ещё
+не реализован; текущий worker выполняет basic analysis. Контракт:
+[tag-pipeline](tag-pipeline.md).

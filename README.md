@@ -280,6 +280,10 @@ M2 — [пакетный импорт через очередь](docs/architectu
 Для дальнейших метрик принят [контракт эволюции](docs/architecture/metric-evolution.md):
 официальный difficulty/pp — первая основа, точные версии вычислителей и отдельные
 семейства результатов; собственные показатели добавляются позднее.
+Для M3 также приняты [контракты тегов и обработки](docs/architecture/tag-pipeline.md):
+версионируемые определения/методы, timing/slider geometry и будущие ML providers,
+мягкий budget около 30 s и возможные GPU stages. Это архитектурный план, не уже
+реализованные классификаторы или измеренная производительность.
 Начните новую сессию с [AGENTS.md](AGENTS.md) и состояния Git.
 Архитектура: [overview](docs/architecture/overview.md), [БД](docs/architecture/database.md).
 Изменения продукта: [CHANGELOG.md](CHANGELOG.md); история решений: [devlog](docs/devlog/README.md).

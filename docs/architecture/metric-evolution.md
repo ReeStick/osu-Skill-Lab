@@ -30,6 +30,12 @@ Difficulty aim/speed и performance aim/speed — разные величины 
 а не неявного универсального «pp карты». Контекст включает применимые hit results,
 combo, misses, slider judgements и stable/lazer/classic semantics вычислителя.
 
+Определяемые tags — отдельный categorical contract, не универсальная feature
+таблица: definitions/bundles и assignments со ссылками на versioned measurements.
+Будущие timing/slider geometry/ML providers, мягкий budget 30 s и GPU capability
+описаны в [tag-pipeline](tag-pipeline.md), решение:
+[ADR-0008](../adr/0008-extensible-tags-and-compute-budget.md).
+
 ## Происхождение и идентичность расчёта
 
 До сохранения первого внешнего расчёта его контракт и миграция должны добавить:

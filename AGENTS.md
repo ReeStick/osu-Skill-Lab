@@ -43,6 +43,15 @@ versions и расширения столбцов — `docs/architecture/metric-
 Этот контракт пока проектный: перед первым внешним расчётом реализуйте его
 provenance/identity в коде и миграции, не назначайте выдуманные версии API-данным.
 
+M3 учитывает отдельный каталог versioned tag definitions/bundles и assignments:
+новый тег не требует столбца, новые числовые признаки остаются типизированными.
+Rule/model outputs не смешиваются с measurements/skill profile/турнирными слотами.
+Архитектурный ориентир — 30 s processing wall time от готового input до commit,
+мягкий, не hard timeout; queue/acquisition и полная latency измеряются отдельно.
+GPU — будущая capability отдельных stages после профилирования, не обязательная
+зависимость CPU-сервиса. Контракт пока проектный: `docs/architecture/tag-pipeline.md`,
+ADR-0008. Не создавать пустой framework/DDL или объявлять ML/GPU работающими заранее.
+
 osu! API сверка явная: `POST /analyses/{id}/verify-osu`. Lookup отправляет только
 checksum; file IDs не являются fallback. Выбранная metadata хранится отдельно
 в `osu_beatmap_matches`, статус `checksum_match` означает наблюдение MD5 на

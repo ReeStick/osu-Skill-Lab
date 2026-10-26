@@ -14,6 +14,7 @@
 - [2026-10-25 — План batch import через зеркала](2026-10-25-mirror-batch-plan.md).
 - [2026-10-25 — Адаптер Hinamizawa и import provenance](2026-10-25-hinamizawa-import.md).
 - [2026-10-26 — Долговечные batch jobs и RabbitMQ worker](2026-10-26-durable-batch-processing.md).
+- [2026-10-26 — Архитектура тегов и compute budget M3](2026-10-26-tag-pipeline-design.md).
 
 ## Шаблон
 

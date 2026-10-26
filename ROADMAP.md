@@ -8,7 +8,7 @@
 | 1 — Beatmap Analysis MVP | Локальная `.osu` → проверка входа → измеряемые признаки → сохранённый результат через REST | Завершён 2026-10-25; вход временный, metadata и результаты постоянные |
 | 1a — osu! API integration | Metadata/identity загруженной карты, checksum verification, OAuth, cache/rate limits | Завершён 2026-10-25; живая сверка и повторное чтение проверены |
 | 2 — Batch Import & Background Processing | Пакет ID → mirror metadata/raw files → RabbitMQ/worker → результаты по каждому элементу; retry и временные исходники | Завершён 2026-10-26: durable jobs, retry/cancel, shared mirror budget; живой batch проверен |
-| 3 — Feature Engineering | Сначала versioned osu! difficulty engine и upstream метрики, затем собственные определения, тесты и сегменты | Не начат; контракт эволюции принят в ADR-0004 |
+| 3 — Feature Engineering | Versioned difficulty/pp components, собственные признаки, tag providers/definitions и сегменты | Проектирование: ADR-0004/0008, мягкий budget 30 s и GPU capability; runtime не начат |
 | 4 — Skill Classification | Размеченный набор, baseline, оценка ошибок и ограничений; ML только при достаточных данных | Не начат |
 | 5 — Tournament Pool Classification | Контекст турнира, multi-label слоты, история разметки, поиск | Не начат |
 | 6 — Public Release | Интерфейс, эксплуатация, мониторинг, развёртывание, публичная документация | Не начат |
@@ -53,3 +53,12 @@ adapter/schema versions, mods/settings и score context. История не п�
 План до подключения первого внешнего вычислителя:
 [metric-evolution](docs/architecture/metric-evolution.md),
 [ADR-0004](docs/adr/0004-versioned-metric-families.md).
+
+Уточнение M3: tags отделены от числовых measurements, их определения и методы
+версионируются. Timing/slider geometry и будущие ML providers включаются в граф
+зависимостей profile; GPU — опциональная capability. Ориентир обработки одной
+карты — 30 s от готового input до commit, без жёсткого обрыва. Полная latency и
+throughput проверяются отдельно, достигнутые показатели пока не заявляются.
+Контракт: [tag-pipeline](docs/architecture/tag-pipeline.md),
+[ADR-0008](docs/adr/0008-extensible-tags-and-compute-budget.md),
+критерии: [M3](docs/milestones/003-feature-engineering.md).
