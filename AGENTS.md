@@ -56,6 +56,17 @@ ADR-0008. Не создавать пустой framework/DDL или объявл
 Capacity согласована с prefetch/import/CPU slots; provider budget остаётся общим.
 Engine/tag/GPU ещё не подключены. См. `docs/architecture/runtime-workers.md`, ADR-0009.
 
+Владелец согласовал ранний M4 workbench `/lab`: append-only human labels,
+immutable tag definitions/rules и logistic baseline на basic-raw features.
+Это отдельный сценарий от автоматических M3 tag providers; M3/M4 не закрыты.
+Предпросмотр работает в browser Web Worker, train — отдельный CPU process,
+один admission slot/API process, не durable training queue. Не превращать
+прогнозы/unsure/unreviewed в ручные negative labels. Контрольные set groups
+исключены из train; interactive control не является final test.
+`0006_label_lab` хранит scalar metadata/lineage и bounded rule JSONB config;
+малые неисполняемые model artifacts — в отдельном каталоге/Compose volume,
+не карты/feature matrices. См. `docs/architecture/label-workbench.md`, ADR-0010.
+
 osu! API сверка явная: `POST /analyses/{id}/verify-osu`. Lookup отправляет только
 checksum; file IDs не являются fallback. Выбранная metadata хранится отдельно
 в `osu_beatmap_matches`, статус `checksum_match` означает наблюдение MD5 на

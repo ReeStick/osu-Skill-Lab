@@ -1,6 +1,6 @@
 # Архитектура
 
-## Реализовано в M0, M1 и срезе M1a
+## Реализованная основа
 
 Модульный монолит с одним Python-пакетом. `main.create_app` — точка сборки;
 `config.Settings` валидирует окружение. `api/` содержит транспорт и зависимости,
@@ -17,6 +17,14 @@ Liveness не зависит от БД. Readiness выполняет `SELECT 1` 
 Readiness не проверяет Alembic head. Compose запускает migration service перед API.
 
 Схема: [foundation.mmd](diagrams/foundation.mmd).
+
+`web/` содержит локальный buildless workbench `/lab`, `application/lab_service.py`
+управляет разметкой, версиями и отдельным CPU training slot. Logistic baseline
+в `analysis/label_baseline.py` не зависит от ORM/HTTP. Browser Web Worker исполняет
+portable scoring по готовым scalar features; PostgreSQL хранит решения/lineage,
+малые model JSON artifacts находятся в отдельном каталоге/Compose volume.
+Это ранний M4 по согласию владельца, не готовый массовый M3 tag pipeline.
+Контракт: [label-workbench](label-workbench.md).
 
 ```mermaid
 flowchart LR

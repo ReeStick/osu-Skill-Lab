@@ -4,19 +4,24 @@ from concurrent.futures import ProcessPoolExecutor
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from osu_skill_lab.api.analyses import router as analyses_router
 from osu_skill_lab.api.batches import router as batches_router
 from osu_skill_lab.api.health import router as health_router
 from osu_skill_lab.api.imports import router as imports_router
+from osu_skill_lab.api.lab import ASSETS
+from osu_skill_lab.api.lab import router as lab_router
 from osu_skill_lab.api.osu import router as osu_router
 from osu_skill_lab.application.batches import BatchService
+from osu_skill_lab.application.lab_service import LabService
 from osu_skill_lab.application.mirror_import import MirrorImportService
 from osu_skill_lab.application.osu_verification import OsuVerificationService
 from osu_skill_lab.application.service import AnalysisService
 from osu_skill_lab.config import Settings
 from osu_skill_lab.infrastructure.database import Database
 from osu_skill_lab.infrastructure.hinamizawa import HinamizawaClient
+from osu_skill_lab.infrastructure.model_artifacts import ModelArtifactStore
 from osu_skill_lab.infrastructure.osu_api import OsuApiClient
 from osu_skill_lab.infrastructure.provider_budget import PostgresMirrorBudget
 
@@ -28,9 +33,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         database = Database(configuration)
         executor = ProcessPoolExecutor(max_workers=2)
+        training_executor = ProcessPoolExecutor(max_workers=1)
         app.state.database = database
         app.state.analysis_service = AnalysisService(database, executor, max_in_flight=2)
         app.state.batch_service = BatchService(database)
+        app.state.lab_service = LabService(
+            database, training_executor, ModelArtifactStore(configuration.model_artifact_directory)
+        )
         osu_api = OsuApiClient(configuration)
         mirror = HinamizawaClient(
             timeout=configuration.mirror_timeout_seconds,
@@ -52,7 +61,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             yield
         finally:
             try:
-                await asyncio.to_thread(executor.shutdown, wait=True, cancel_futures=True)
+                try:
+                    await asyncio.to_thread(
+                        training_executor.shutdown, wait=True, cancel_futures=True
+                    )
+                finally:
+                    await asyncio.to_thread(executor.shutdown, wait=True, cancel_futures=True)
             finally:
                 try:
                     try:
@@ -74,4 +88,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(osu_router)
     app.include_router(imports_router)
     app.include_router(batches_router)
+    app.include_router(lab_router)
+    app.mount("/lab/assets", StaticFiles(directory=ASSETS, check_dir=False), name="lab-assets")
     return app

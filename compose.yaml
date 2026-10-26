@@ -16,6 +16,7 @@ x-app: &app
     OSU_LAB_MIRROR_CACHE_TTL_SECONDS: ${OSU_LAB_MIRROR_CACHE_TTL_SECONDS:-600}
     OSU_LAB_RABBITMQ_URL: amqp://${RABBITMQ_USER:-osu_lab}:${RABBITMQ_PASSWORD:-osu_lab_local}@rabbitmq:5672/
     OSU_LAB_WORKER_CONCURRENCY: ${OSU_LAB_WORKER_CONCURRENCY:-1}
+    OSU_LAB_MODEL_ARTIFACT_DIRECTORY: /var/lib/osu-skill-lab/models
 
 services:
   rabbitmq:
@@ -61,6 +62,8 @@ services:
 
   api:
     <<: *app
+    volumes:
+      - model_artifacts:/var/lib/osu-skill-lab/models
     ports:
       - "127.0.0.1:${API_PORT:-8000}:8000"
     depends_on:
@@ -97,3 +100,4 @@ services:
 volumes:
   postgres_data:
   rabbitmq_data:
+  model_artifacts:

@@ -6,6 +6,11 @@
 
 ### Added
 
+- Локальный `/lab`: ручная разметка тегов, история/undo, контрольная выборка,
+  ползунки правила, версии и быстрый Web Worker preview без повторного анализа карт.
+- Обучаемый logistic baseline в отдельном CPU-процессе, train-only preprocessing,
+  исключение контрольных сетов, immutable model artifacts и lineage до label events.
+- Migration `0006_label_lab` и отдельный Compose volume для JSON artifacts моделей.
 - Worker concurrency 1..32 через env/CLI: общая runtime queue, bounded consumer
   prefetch, параллельные imports/CPU slots и возврат unacked jobs при остановке.
 - Долговечные пакеты `POST/GET /analysis-batches`, Idempotency-Key, per-item status,

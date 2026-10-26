@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>Разметка · osu! Skill Lab</title>
+    <link rel="icon" href="/lab/assets/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/lab/assets/lab.css" />
+    <script type="module" src="/lab/assets/lab.js"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/lab"
+        ><span class="brand-mark">sl<span>·</span></span
+        ><span>osu! Skill Lab<small>РАБОЧАЯ СРЕДА РАЗМЕТКИ</small></span></a
+      >
+      <div class="top-actions">
+        <span class="live-dot"></span><span id="connection">Подключаемся…</span
+        ><a href="/docs" target="_blank" rel="noopener">API ↗</a>
+      </div>
+    </header>
+    <div class="workspace">
+      <aside class="sidebar">
+        <div class="sidebar-heading">
+          <span>ВАШИ ТЕГИ</span
+          ><button id="new-tag" class="icon-button" aria-label="Создать тег">＋</button>
+        </div>
+        <div id="tag-list" class="tag-list"></div>
+        <div class="sidebar-note">
+          <span class="note-symbol">↗</span><strong>От примеров к модели</strong>
+          <p>Разметьте карты, проверьте правило и обучите baseline на своих решениях.</p>
+        </div>
+        <div class="sidebar-footer">
+          Локальная лаборатория<span>Ручные метки ≠ прогнозы модели</span>
+        </div>
+      </aside>
+      <main>
+        <section class="page-heading">
+          <div>
+            <div class="eyebrow">LABEL WORKBENCH <span> / </span> BASIC RAW</div>
+            <h1 id="tag-title">Выберите свой первый тег</h1>
+            <p id="tag-description">Начните с определения паттерна и нескольких примеров.</p>
+          </div>
+          <div class="heading-actions">
+            <button id="refresh" class="button secondary">↻ Обновить</button
+            ><button id="upload" class="button secondary">＋ Добавить .osu</button
+            ><input id="file-input" type="file" accept=".osu" multiple hidden />
+          </div>
+        </section>
+        <div class="modebar">
+          <div class="tabs" role="tablist" aria-label="Режим работы">
+            <button id="tab-label" role="tab" aria-selected="true" class="tab active">
+              01 <span>Разметка</span></button
+            ><button id="tab-rule" role="tab" aria-selected="false" class="tab">
+              02 <span>Правило и модель</span>
+            </button>
+          </div>
+          <span id="dataset-status" class="dataset-status">Фичи загружаются один раз на набор</span>
+        </div>
+        <div class="content-grid">
+          <section class="card collection">
+            <div class="collection-heading">
+              <div>
+                <h2>Рабочая выборка <span id="map-count" class="count">0</span></h2>
+                <p id="collection-hint">Выберите карту, чтобы принять решение по тегу.</p>
+              </div>
+              <span id="prediction-mode" class="badge">Черновик правила</span>
+            </div>
+            <div class="filters">
+              <input
+                id="search"
+                type="search"
+                placeholder="Поиск по карте, артисту или difficulty…"
+                aria-label="Поиск карты"
+              /><select id="filter" aria-label="Фильтр разметки">
+                <option value="all">Все решения</option>
+                <option value="unreviewed">Не размечены</option>
+                <option value="yes">Есть тег</option>
+                <option value="no">Нет тега</option>
+                <option value="unsure">Не уверен</option>
+                <option value="validation">Контрольные</option>
+                <option value="disagree">Расхождения</option></select
+              ><select id="sort" aria-label="Порядок карт">
+                <option value="id">Порядок загрузки</option>
+                <option value="score">Высокая оценка</option>
+                <option value="boundary">Около порога</option>
+                <option value="mixed">Смешанная выборка</option>
+              </select>
+            </div>
+            <div id="score-strip" class="score-strip" hidden>
+              <canvas id="histogram" height="72" aria-label="Распределение оценок"></canvas>
+              <div>
+                <strong id="matching">0 карт</strong><span>выше выбранного порога</span
+                ><small id="preview-time">—</small>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>КАРТА / DIFFICULTY</th>
+                    <th>РЕШЕНИЕ</th>
+                    <th>ОЦЕНКА</th>
+                  </tr>
+                </thead>
+                <tbody id="map-list"></tbody>
+              </table>
+              <div id="empty" class="empty" hidden>
+                <span>◌</span>
+                <h3>Здесь появятся ваши карты</h3>
+                <p>
+                  Загрузите .osu или дождитесь завершения пакетного анализа. Исходные файлы
+                  постоянно не хранятся.
+                </p>
+              </div>
+            </div>
+            <footer class="collection-footer">
+              <span id="label-counts">Решения ещё не приняты</span
+              ><span><kbd>↑</kbd><kbd>↓</kbd> навигация</span>
+            </footer>
+            <div class="decision-panel">
+              <div><small>ВЫБРАННАЯ КАРТА</small><strong id="selected-title">—</strong></div>
+              <div class="decisions">
+                <button id="label-yes" class="decision yes" data-label="yes">
+                  <kbd>1</kbd> Есть тег</button
+                ><button id="label-no" class="decision no" data-label="no">
+                  <kbd>2</kbd> Нет тега</button
+                ><button id="label-unsure" class="decision unsure" data-label="unsure">
+                  <kbd>3</kbd> Не уверен
+                </button>
+              </div>
+              <div class="decision-options">
+                <label><input id="validation" type="checkbox" /> Контрольный пример</label
+                ><button id="undo" class="text-button" disabled>↶ Отменить решение</button
+                ><a id="map-link" href="#" target="_blank" rel="noopener" hidden>Карта на osu! ↗</a>
+              </div>
+            </div>
+          </section>
+          <aside class="inspector">
+            <section id="rule-panel" class="card settings" hidden>
+              <div class="section-label">ЖИВОЙ ПРЕДПРОСМОТР</div>
+              <h2>Конструктор тега</h2>
+              <label class="field-label" for="scoring-source">Источник оценки</label
+              ><select id="scoring-source">
+                <option value="manual">Ручное правило</option>
+              </select>
+              <div class="slider-row threshold-row">
+                <div>
+                  <label for="threshold">Порог назначения</label
+                  ><output id="threshold-value">0.50</output>
+                </div>
+                <input id="threshold" type="range" min="0" max="1" step="0.01" value="0.5" />
+              </div>
+              <div id="manual-controls">
+                <div class="slider-row">
+                  <div>
+                    <label for="bias">Общее смещение</label><output id="bias-value">0.00</output>
+                  </div>
+                  <input id="bias" type="range" min="-5" max="5" step="0.05" value="0" />
+                </div>
+                <div class="weights-heading">
+                  <span>ВЛИЯНИЕ ПРИЗНАКОВ</span
+                  ><button id="reset-weights" class="text-button">Сбросить</button>
+                </div>
+                <p class="hint">
+                  Вес применяется к стандартизованной фиче. Это параметр правила, не измеренная
+                  важность.
+                </p>
+                <div id="weights"></div>
+              </div>
+              <div class="save-row">
+                <button id="save-rule" class="button primary">Сохранить версию</button
+                ><select id="saved-rules" aria-label="Сохранённые версии">
+                  <option value="">Сохранённые версии…</option>
+                </select>
+              </div>
+            </section>
+            <section id="feature-panel" class="card feature-panel">
+              <div class="section-label">КОНТЕКСТ КАРТЫ</div>
+              <h2>Измеряемые признаки</h2>
+              <p class="hint">
+                Raw-координаты и тайминги без mods. Здесь пока нет SR, pp или полного проигрывания
+                карты.
+              </p>
+              <dl id="feature-values"></dl>
+            </section>
+            <section class="card learning">
+              <div class="section-label">ОБУЧАЕМЫЙ BASELINE</div>
+              <h2>На ваших примерах</h2>
+              <p id="training-hint">
+                Нужно по два подтверждённых обучающих примера каждого класса.
+              </p>
+              <button id="train-model" class="button primary">Обучить модель</button>
+              <div id="model-info" class="model-info">Модель ещё не обучена</div>
+              <div id="validation-metrics" class="validation-metrics">
+                Отметьте отдельные контрольные карты для проверки.
+              </div>
+              <p class="hint">
+                Оценка модели не является проверенной вероятностью. Контрольные карты и связанные с
+                ними сеты не участвуют в обучении.
+              </p>
+            </section>
+          </aside>
+        </div>
+      </main>
+    </div>
+    <dialog id="tag-dialog">
+      <form id="tag-form">
+        <div class="section-label">НОВОЕ ОПРЕДЕЛЕНИЕ</div>
+        <h2>Какой паттерн ищем?</h2>
+        <label for="tag-name">Название тега</label
+        ><input id="tag-name" required maxlength="128" placeholder="Например: смены темпа" /><label
+          for="tag-definition"
+          >Что считать положительным примером?</label
+        ><textarea
+          id="tag-definition"
+          required
+          maxlength="2048"
+          rows="4"
+          placeholder="Опишите критерий, примеры и исключения…"
+        ></textarea>
+        <p class="hint">
+          Определение относится к карте целиком без mods. Оно сохраняется вместе с тегом.
+        </p>
+        <div class="dialog-actions">
+          <button type="button" id="close-dialog" class="button secondary">Отмена</button
+          ><button type="submit" class="button primary">Создать тег</button>
+        </div>
+      </form>
+    </dialog>
+    <div id="toast" role="status" aria-live="polite" hidden></div>
+  </body>
+</html>

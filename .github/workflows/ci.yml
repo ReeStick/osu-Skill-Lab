@@ -21,6 +21,7 @@ jobs:
       - run: uv run --locked ruff format --check .
       - run: uv run --locked mypy
       - run: uv run --locked pytest -m "not integration"
+      - run: node --test tests/web/score-core.test.mjs
 
   postgres:
     runs-on: ubuntu-latest
@@ -70,6 +71,8 @@ jobs:
       - run: docker compose up --build --wait api dispatcher worker
       - run: curl --fail http://127.0.0.1:8000/health/live
       - run: curl --fail http://127.0.0.1:8000/health/ready
+      - run: curl --fail --output /dev/null http://127.0.0.1:8000/lab
+      - run: curl --fail --output /dev/null http://127.0.0.1:8000/lab/assets/lab.js
       - run: >-
           curl --fail --header 'Content-Type: application/octet-stream'
           --data-binary @tests/fixtures/analytic-v14.osu

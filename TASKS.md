@@ -5,7 +5,25 @@
 **M1a — osu! API metadata/identity завершён** (2026-10-25), включая живую OAuth-сверку.
 **M2 — Batch Import & Background Processing завершён** (2026-10-26).
 Текущий этап — M3: работает CPU runtime foundation с configurable worker capacity.
-SR/pp engine, tag registry и ML/GPU ещё не реализованы.
+SR/pp engine, автоматические tag providers и GPU ещё не реализованы.
+По согласию владельца добавлен ранний срез M4: локальная разметка и logistic baseline.
+
+## Ранний M4 — гибридный workbench
+
+- [x] `/lab`: каталог тегов/definitions, ручные yes/no/unsure, контрольные карты и undo.
+- [x] Append-only labels и optimistic guard, immutable версии правил и моделей.
+- [x] Web Worker preview на готовых фичах; threshold переиспользует scoring cache.
+- [x] Train-only preprocessing и logistic baseline в отдельном CPU-процессе.
+- [x] Контрольные set groups исключены из train; model lineage/profile/artifact hashes.
+- [x] `0006_label_lab`: пять используемых таблиц, отдельное хранение model JSON artifacts.
+- [x] Целевые PostgreSQL/CPU/JS и Chrome-сценарии; Docker API с локальным UI.
+- [ ] Собрать реальные labels, grouped final test, оценить ошибки/качество/latency.
+- [ ] Подключить проверенные difficulty/pp components и providers M3.
+
+Контракт: [label-workbench](docs/architecture/label-workbench.md),
+решение: [ADR-0010](docs/adr/0010-hybrid-label-workbench.md).
+Проверки и ограничения: [devlog](docs/devlog/2026-10-26-label-workbench.md).
+M3 и полный M4 не закрыты; ранний UI — согласованное изменение порядка работ.
 
 ## Первый runtime срез M3 — очередь и мощность worker
 
@@ -224,7 +242,8 @@ On-demand file import выделяется отдельно после пров�
 Первый срез M3 — выбрать и проверить актуальный difficulty engine, реализовать
 контракт ADR-0004 и сопоставление upstream полей; затем собственные признаки.
 Подготовлен контракт tag registry/compute budget по ADR-0008. Timing/geometry tags
-получат определения и тесты; обученные ML-классификаторы не заявляются готовыми.
+получат определения и тесты. Logistic baseline раннего M4 уже работает, но качество
+skill classification на реальных данных ещё не установлено.
 
 ## Технический долг и открытые решения
 

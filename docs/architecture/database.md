@@ -9,6 +9,8 @@ PostgreSQL 17, SQLAlchemy 2.0 async с asyncpg, Alembic через `run_sync`.
 отдельного кеша metadata, полученной при явной сверке с сайтом.
 Ревизия `0004_sources` добавляет четвёртую — `beatmap_sources`: происхождение
 download bytes и версии metadata adapter, отдельно от официального API match.
+`0005_batch_jobs` добавляет batch/jobs/provider budgets, `0006_label_lab` — пять
+таблиц разметки, правил и model lineage. Итого 12 предметных таблиц, без исходников.
 Решение о временном входе и компактных результатах:
 [ADR-0003](../adr/0003-transient-inputs-compact-results.md).
 
@@ -124,7 +126,7 @@ Settings сохранены типизированными столбцами: H
 [basic-features](basic-features.md). Star rating, PP,
 skill profile и турнирные слоты этими измерениями не подменяются.
 
-`configuration` — единственный JSONB-столбец: небольшой объект параметров,
+`analysis_results.configuration` — небольшой JSONB-объект параметров,
 а не feature vector или копия разобранной карты. PostgreSQL проверяет
 `jsonb_typeof(configuration) = 'object'` и
 `octet_length(configuration::text) <= 4096`. Индекса GIN нет. Текущая
@@ -136,7 +138,7 @@ Application канонизирует конфигурацию через `json.d
 В `configuration_sha256` хранится 32-байтовый digest. Его соответствие JSON
 задаёт preparation-код; БД проверяет длину, но сама digest не пересчитывает.
 Версии алгоритма и reader хранятся непосредственно в результате; отдельных
-справочников AlgorithmVersion или AnalysisJob в текущей схеме нет.
+справочника AlgorithmVersion нет; jobs M2 описаны отдельно ниже.
 
 Количество полей входа и результата не зависит от числа объектов карты.
 Ограниченные metadata и configuration остаются переменными по размеру;
@@ -229,5 +231,21 @@ Download provider и официальный checksum verification
 строки не означает, что тег вычислен и не назначен. Model/config/definition revisions
 не перезаписывают старые результаты. Новые теги не требуют отдельного столбца;
 новые числовые measurements вводятся миграциями в своём семействе.
-Это проект, не существующие таблицы. Поля/identity и будущие stage timings:
+Это проект автоматического pipeline, не существующие таблицы providers/assignments.
+Ранний workbench ниже реализует отдельный каталог human definitions и решений.
+Поля/identity и будущие stage timings:
 [tag-pipeline](tag-pipeline.md), [ADR-0008](../adr/0008-extensible-tags-and-compute-budget.md).
+
+## Ранний M4: разметка и модели
+
+`0006_label_lab` добавляет `lab_tags`, `lab_label_events`, `lab_rules`, `lab_models`,
+`lab_model_examples`. Определения и версии immutable через API, label events
+append-only. Связи с точным input/analysis и label event позволяют воспроизвести
+состав train/validation. Признаки остаются типизированными колонками результатов.
+`lab_rules.specification` — второй JSONB конфигурации, ограниченный 8192 bytes;
+он содержит recipe/нормализацию либо model reference, не measured feature vectors.
+Model weights/preprocessing хранятся отдельными JSON artifacts до 64 KiB с
+SHA-256 в БД. Compose volume и PostgreSQL нужно резервировать совместно.
+Таблицы пока не служат automatic tag-run registry или постоянным prediction cache.
+Полный контракт: [label-workbench](label-workbench.md),
+[ADR-0010](../adr/0010-hybrid-label-workbench.md).

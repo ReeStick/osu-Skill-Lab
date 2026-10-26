@@ -14,6 +14,7 @@
 - [0008 — Расширяемые теги и compute budget M3](0008-extensible-tags-and-compute-budget.md).
 - [0009 — Общая runtime queue и мощность worker](0009-worker-concurrency.md),
   заменяет ограничение worker capacity в пункте 6 ADR-0007.
+- [0010 — Гибридный интерфейс разметки и baseline](0010-hybrid-label-workbench.md).
 
 ## Шаблон
 

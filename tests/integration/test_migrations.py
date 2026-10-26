@@ -34,6 +34,11 @@ def exercise_migrations(connection: Connection) -> None:
         "analysis_results",
         "beatmap_inputs",
         "beatmap_sources",
+        "lab_label_events",
+        "lab_model_examples",
+        "lab_models",
+        "lab_rules",
+        "lab_tags",
         "osu_beatmap_matches",
         "provider_budgets",
     ]

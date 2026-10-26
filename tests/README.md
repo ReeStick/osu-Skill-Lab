@@ -27,3 +27,9 @@ uv run --locked osu-skill-lab inspect-osu data/unpacked_osu_maps --recursive
 ```
 
 Сводки реальных карт остаются в `data/`; CI запускает только синтетические случаи.
+
+Workbench: `tests/unit/test_lab.py`, `tests/integration/test_lab.py`,
+`node --test tests/web/score-core.test.mjs` (Node 22+ только для разработки/CI).
+Python/JS parity test использует Node при наличии; без Node он skip.
+PostgreSQL tests проверяют labels/optimistic conflict, версии, настоящий CPU train,
+model lineage и повреждённый artifact; синтетические labels не записываются в dev БД.

@@ -1,5 +1,6 @@
 """Validated configuration, loaded explicitly by entry points."""
 
+from pathlib import Path
 from typing import Literal
 
 from pydantic import Field, SecretStr, field_validator, model_validator
@@ -28,6 +29,7 @@ class Settings(BaseSettings):
     mirror_cache_ttl_seconds: int = Field(default=600, ge=60, le=86400)
     rabbitmq_url: SecretStr = SecretStr("amqp://osu_lab:osu_lab_local@127.0.0.1:5672/")
     worker_concurrency: int = Field(default=1, ge=1, le=32)
+    model_artifact_directory: Path = Path("data/model_artifacts")
 
     @field_validator("rabbitmq_url")
     @classmethod

@@ -181,4 +181,6 @@ Benchmark оформляется в `docs/experiments/`: версии input/engi
 worker и времена стадий. Для ML отдельно оценивается качество на размеченных данных,
 не только latency. 33 локальные карты — smoke corpus, не доказательство скорости
 или качества на библиотеке osu!. 30 s — ориентир до этих замеров, а не достигнутая
-характеристика. Training/classification rollout остаются отдельным объёмом M4.
+характеристика. По согласию владельца ранний UI и logistic baseline M4 уже
+реализованы отдельно: [label-workbench](label-workbench.md). Они работают на
+basic-raw scalars; rollout автоматических providers и оценка качества ещё впереди.

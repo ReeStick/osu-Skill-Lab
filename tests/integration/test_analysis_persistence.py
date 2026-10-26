@@ -294,6 +294,11 @@ async def test_actual_schema_has_only_digest_bytes_and_configuration_json(
                     "analysis_batches",
                     "analysis_jobs",
                     "provider_budgets",
+                    "lab_tags",
+                    "lab_label_events",
+                    "lab_rules",
+                    "lab_models",
+                    "lab_model_examples",
                 )
             }
         )
@@ -328,5 +333,9 @@ async def test_actual_schema_has_only_digest_bytes_and_configuration_json(
         ("analysis_batches", "configuration_sha256"),
         ("analysis_jobs", "expected_sha256"),
         ("analysis_jobs", "observed_sha256"),
+        ("lab_tags", "definition_sha256"),
+        ("lab_rules", "configuration_sha256"),
+        ("lab_models", "artifact_sha256"),
+        ("lab_models", "training_sha256"),
     }
-    assert json_columns == {("analysis_results", "configuration")}
+    assert json_columns == {("analysis_results", "configuration"), ("lab_rules", "specification")}

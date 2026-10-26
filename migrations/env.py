@@ -14,6 +14,13 @@ from osu_skill_lab.infrastructure.job_models import (  # noqa: F401
     AnalysisJob,
     ProviderBudget,
 )
+from osu_skill_lab.infrastructure.lab_models import (  # noqa: F401
+    LabLabelEvent,
+    LabModel,
+    LabModelExample,
+    LabRule,
+    LabTag,
+)
 from osu_skill_lab.infrastructure.models import (  # noqa: F401
     AnalysisResult,
     BeatmapInput,
