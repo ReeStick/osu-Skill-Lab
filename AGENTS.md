@@ -51,6 +51,10 @@ Rule/model outputs не смешиваются с measurements/skill profile/т�
 GPU — будущая capability отдельных stages после профилирования, не обязательная
 зависимость CPU-сервиса. Контракт пока проектный: `docs/architecture/tag-pipeline.md`,
 ADR-0008. Не создавать пустой framework/DDL или объявлять ML/GPU работающими заранее.
+Первый runtime срез использует общую очередь M2 и configurable CPU worker:
+`OSU_LAB_WORKER_CONCURRENCY=1..32` (default 1), CLI `worker --concurrency N`.
+Capacity согласована с prefetch/import/CPU slots; provider budget остаётся общим.
+Engine/tag/GPU ещё не подключены. См. `docs/architecture/runtime-workers.md`, ADR-0009.
 
 osu! API сверка явная: `POST /analyses/{id}/verify-osu`. Lookup отправляет только
 checksum; file IDs не являются fallback. Выбранная metadata хранится отдельно

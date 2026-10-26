@@ -9,6 +9,6 @@
   тестами и живой OAuth-сверкой одной карты.
 - [M2 — Batch Import & Background Processing](002-batch-background.md):
   завершён: durable batch, RabbitMQ/worker, retry/cancel и живой импорт двух IDs.
-- [M3 — Feature Engineering и теги](003-feature-engineering.md): проектирование,
-  versioned providers, мягкий budget 30 s и будущая GPU capability; runtime ещё нет.
+- [M3 — Feature Engineering и теги](003-feature-engineering.md): CPU runtime queue
+  и worker capacity готовы; difficulty/tag providers и GPU пока в проекте.
 - Остальные этапы пока только в [ROADMAP](../../ROADMAP.md).

@@ -6,6 +6,8 @@
 
 ### Added
 
+- Worker concurrency 1..32 через env/CLI: общая runtime queue, bounded consumer
+  prefetch, параллельные imports/CPU slots и возврат unacked jobs при остановке.
 - Долговечные пакеты `POST/GET /analysis-batches`, Idempotency-Key, per-item status,
   checksum pins и cancel; RabbitMQ dispatcher/worker с leases и ограниченными retry.
 - Общий Hinamizawa pacing/cooldown в PostgreSQL, RAM-only input с SHA pin на retry.

@@ -1,6 +1,6 @@
 # M3 — Feature Engineering и расширяемые теги
 
-Status: Design in progress; runtime implementation not started
+Status: In progress; CPU runtime queue/concurrency implemented, engine/tags pending
 Date: 2026-10-26
 
 ## Принятый объём
@@ -12,6 +12,8 @@ Date: 2026-10-26
 
 ## Критерии реализации
 
+- [x] Runtime queue и отдельный CPU worker: configurable capacity 1..32, default 1.
+- [x] Общий queue для разных capacities, bounded prefetch/import/CPU slots и recovery tests.
 - [ ] Выбрать точные engine/binding/upstream revisions и проверить coverage компонентов, включая reading.
 - [ ] Реализовать provider provenance/identity и миграции typed difficulty/performance.
 - [ ] Проверить mods/score scenarios, components и отсутствие тихой подмены версии.
@@ -30,3 +32,5 @@ GPU inference/training и качество ML не заявляются реал
 Контракты: [metric-evolution](../architecture/metric-evolution.md),
 [tag-pipeline](../architecture/tag-pipeline.md),
 [ADR-0008](../adr/0008-extensible-tags-and-compute-budget.md).
+Первый runtime срез: [runtime-workers](../architecture/runtime-workers.md),
+[ADR-0009](../adr/0009-worker-concurrency.md).

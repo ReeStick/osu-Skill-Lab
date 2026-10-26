@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     mirror_timeout_seconds: float = Field(default=20.0, gt=0, le=30)
     mirror_cache_ttl_seconds: int = Field(default=600, ge=60, le=86400)
     rabbitmq_url: SecretStr = SecretStr("amqp://osu_lab:osu_lab_local@127.0.0.1:5672/")
+    worker_concurrency: int = Field(default=1, ge=1, le=32)
 
     @field_validator("rabbitmq_url")
     @classmethod

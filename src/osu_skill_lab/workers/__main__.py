@@ -15,8 +15,11 @@ from osu_skill_lab.workers.dispatcher import serve as dispatch
 from osu_skill_lab.workers.import_worker import ImportWorker, WorkerRestartRequired
 
 
-async def run(role: str) -> None:
+async def run(role: str, *, concurrency: int | None = None) -> None:
     settings = Settings()
+    parallelism = settings.worker_concurrency if concurrency is None else concurrency
+    if not 1 <= parallelism <= 32:
+        raise ValueError("Worker concurrency must be between 1 and 32")
     database = Database(settings)
     task = asyncio.current_task()
     assert task is not None
@@ -27,19 +30,25 @@ async def run(role: str) -> None:
         if role == "dispatcher":
             await dispatch(database, settings.rabbitmq_url.get_secret_value())
         else:
-            executor = ProcessPoolExecutor(max_workers=1)
+            executor = ProcessPoolExecutor(max_workers=parallelism)
             mirror = HinamizawaClient(
                 timeout=settings.mirror_timeout_seconds,
                 cache_ttl=settings.mirror_cache_ttl_seconds,
                 budget=PostgresMirrorBudget(database),
             )
             try:
-                service = AnalysisService(database, executor, max_in_flight=1)
+                service = AnalysisService(database, executor, max_in_flight=parallelism)
                 importer = MirrorImportService(
-                    mirror, service, official_cache_ttl=settings.osu_cache_ttl_seconds
+                    mirror,
+                    service,
+                    official_cache_ttl=settings.osu_cache_ttl_seconds,
+                    max_in_flight=parallelism,
+                    max_concurrent=parallelism,
                 )
+                logging.getLogger(__name__).info("Runtime worker capacity: %s maps", parallelism)
                 await ImportWorker(database, importer).serve(
-                    settings.rabbitmq_url.get_secret_value()
+                    settings.rabbitmq_url.get_secret_value(),
+                    concurrency=parallelism,
                 )
             finally:
                 try:
@@ -53,14 +62,25 @@ async def run(role: str) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("role", choices=["dispatcher", "worker"])
+    parser.add_argument(
+        "--concurrency",
+        type=int,
+        metavar="N",
+        help="Worker map slots, 1..32; overrides environment",
+    )
     args = parser.parse_args()
+    if args.concurrency is not None:
+        if args.role != "worker":
+            parser.error("--concurrency is only supported for worker")
+        if not 1 <= args.concurrency <= 32:
+            parser.error("--concurrency must be between 1 and 32")
     logging.basicConfig(level=logging.INFO)
     # Transport logs can contain connection URLs. Application logs use exception types only.
     for name in ("aio_pika", "aiormq"):
         logging.getLogger(name).setLevel(logging.CRITICAL)
     with suppress(KeyboardInterrupt, asyncio.CancelledError):
         try:
-            asyncio.run(run(args.role))
+            asyncio.run(run(args.role, concurrency=args.concurrency))
         except WorkerRestartRequired:
             logging.getLogger(__name__).error("Worker CPU process unavailable; restart required")
             raise SystemExit(1) from None

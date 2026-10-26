@@ -2,7 +2,6 @@ import asyncio
 import logging
 from uuid import UUID
 
-from pydantic import ValidationError
 from sqlalchemy import select
 
 from osu_skill_lab.application.mirror_import import MirrorImportService
@@ -18,16 +17,14 @@ from osu_skill_lab.infrastructure import job_repository
 from osu_skill_lab.infrastructure.database import Database
 from osu_skill_lab.infrastructure.job_models import AnalysisJob
 from osu_skill_lab.infrastructure.job_repository import ClaimedJob
-from osu_skill_lab.infrastructure.rabbitmq import JobMessage, RabbitBroker
+from osu_skill_lab.infrastructure.rabbitmq import RabbitBroker
+from osu_skill_lab.workers.runtime import WorkerRestartRequired as WorkerRestartRequired
+from osu_skill_lab.workers.runtime import consume_jobs
 
 logger = logging.getLogger(__name__)
 
 
 class LeaseLost(RuntimeError):
-    pass
-
-
-class WorkerRestartRequired(RuntimeError):
     pass
 
 
@@ -143,25 +140,13 @@ class ImportWorker:
                 retry_after=retry_after,
             )
 
-    async def serve(self, broker_url: str) -> None:
+    async def serve(self, broker_url: str, *, concurrency: int = 1) -> None:
+        if not 1 <= concurrency <= 32:
+            raise ValueError("Worker concurrency must be between 1 and 32")
         while True:
             try:
-                async with RabbitBroker(broker_url) as broker:
-                    while True:
-                        message = await broker.receive()
-                        if message is None:
-                            await asyncio.sleep(0.5)
-                            continue
-                        try:
-                            if len(message.body) > 256:
-                                raise ValueError("Oversized message")
-                            envelope = JobMessage.model_validate_json(message.body)
-                        except (ValidationError, ValueError):
-                            await message.reject(requeue=False)
-                            continue
-                        # An exception closes this connection: unacked delivery is requeued.
-                        await self.process(envelope.item_id)
-                        await message.ack()
+                async with RabbitBroker(broker_url, prefetch_count=concurrency) as broker:
+                    await consume_jobs(broker, self.process, concurrency=concurrency)
             except asyncio.CancelledError:
                 raise
             except WorkerRestartRequired:

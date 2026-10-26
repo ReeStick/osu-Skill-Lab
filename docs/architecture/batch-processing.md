@@ -53,7 +53,8 @@ Notification — только `version=1,item_id`; без bytes, metadata, crede
 Старый lease не может записать success/error/pin или продлиться после отмены/истечения.
 
 Пять попыток, lease 90 s, heartbeat 15 s, повтор уведомления через 30 s, polling
-dispatcher 1 s. Один активный item/CPU process на worker. AMQP connection/publish
+dispatcher 1 s. Worker capacity 1..32, default 1; prefetch/import/CPU slots согласованы.
+Контракт: [runtime-workers](runtime-workers.md). AMQP connection/publish
 ограничены 5 s; недоступность транспорта даёт reconnect с паузой 5 s. Queue durable,
 2000 ready messages, overflow reject-publish; single-node, volume сохраняет broker state.
 

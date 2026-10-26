@@ -2,7 +2,7 @@ import asyncio
 import time
 from collections import OrderedDict
 from collections.abc import AsyncIterator, Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
 from osu_skill_lab.application.contracts import SaveAnalysisOutcome
@@ -19,6 +19,12 @@ class CachedImport:
     expires_at: float
 
 
+@dataclass(slots=True)
+class ImportGate:
+    lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    users: int = 0
+
+
 class MirrorImportService:
     def __init__(
         self,
@@ -26,12 +32,17 @@ class MirrorImportService:
         analyses: AnalysisService,
         *,
         official_cache_ttl: int = 3600,
+        max_in_flight: int = 2,
+        max_concurrent: int = 1,
     ) -> None:
+        if not 1 <= max_concurrent <= max_in_flight <= 32:
+            raise ValueError("Expected 1 <= max_concurrent <= max_in_flight <= 32")
         self.api, self.analyses = api, analyses
         self.official_cache_ttl = official_cache_ttl
-        self._lock = asyncio.Lock()
-        self._tokens: asyncio.Queue[None] = asyncio.Queue(maxsize=2)
-        for _ in range(2):
+        self._slots = asyncio.Semaphore(max_concurrent)
+        self._gates: dict[int, ImportGate] = {}
+        self._tokens: asyncio.Queue[None] = asyncio.Queue(maxsize=max_in_flight)
+        for _ in range(max_in_flight):
             self._tokens.put_nowait(None)
         self._cache: OrderedDict[int, CachedImport] = OrderedDict()
 
@@ -48,8 +59,10 @@ class MirrorImportService:
             raise MirrorError(
                 "mirror_busy", "Mirror import capacity is full", retryable=True, retry_after=1
             ) from None
+        gate = self._gates.setdefault(beatmap_id, ImportGate())
+        gate.users += 1
         try:
-            async with self._lock:
+            async with gate.lock, self._slots:
                 resolved = await self.api.resolve_ids([beatmap_id])
                 if resolved.issues:
                     issue = resolved.issues[0]
@@ -92,7 +105,8 @@ class MirrorImportService:
                         )
                     record = await self.analyses.get_analysis(cached.result_id)
                     if record is not None:
-                        self._cache.move_to_end(beatmap_id)
+                        if beatmap_id in self._cache:
+                            self._cache.move_to_end(beatmap_id)
                         return SaveAnalysisOutcome(record, False)
                 downloaded = await self.api.download(metadata, expected_sha256=expected_sha256)
                 if before_analysis is not None:
@@ -113,4 +127,7 @@ class MirrorImportService:
                     self._cache.popitem(last=False)
                 return outcome
         finally:
+            gate.users -= 1
+            if gate.users == 0:
+                del self._gates[beatmap_id]
             self._tokens.put_nowait(None)

@@ -1,6 +1,6 @@
 # M3: признаки, определения тегов и бюджет обработки
 
-Status: Accepted design; runtime/schema not implemented
+Status: Accepted tag/feature design; CPU execution foundation implemented, tag runtime/schema pending
 Date: 2026-10-26
 
 Владелец расширил M3: official difficulty/pp с компонентами — первый источник,
@@ -145,7 +145,10 @@ lease M2 90 s не заменяется 30 s budget. Конкретные cost e
 
 ## CPU/GPU execution
 
-Первый difficulty adapter выполняется в CPU worker. GPU capability — отдельный
+Первый difficulty adapter будет выполняться в CPU worker.
+Работающая очередь и configurable capacity текущего CPU worker описаны в
+[runtime-workers](runtime-workers.md); он пока выполняет basic pipeline.
+GPU capability — отдельный
 класс исполнителя/маршрутизация для подходящих будущих stages. Базовый сервис
 работает без CUDA; обязательная GPU stage без исполнителя ожидает capability или
 возвращает unsupported по контракту. CPU fallback разрешается только для заранее

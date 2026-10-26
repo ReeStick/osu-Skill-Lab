@@ -125,6 +125,22 @@ Bytes только RAM; retry повторяет загрузку с observed SH
 [batch-processing](docs/architecture/batch-processing.md), проверенный живой batch:
 [devlog](docs/devlog/2026-10-26-durable-batch-processing.md).
 
+## Мощность worker
+
+По умолчанию worker обрабатывает одну карту. Для нескольких одновременно:
+
+```text
+uv run --locked python -m osu_skill_lab.workers worker --concurrency 4
+```
+
+Или задайте `OSU_LAB_WORKER_CONCURRENCY=4` в окружении экземпляра (1..32).
+CLI имеет приоритет над env. В Compose передаётся та же настройка. Она согласует
+broker prefetch, активные imports и CPU processes; API pool от неё не меняется.
+На разных машинах можно запускать workers с разными N, подключённые к общей БД
+и RabbitMQ. Каждая job — одна карта со своими retry/status, не неделимый пакет.
+Общий budget запросов к зеркалу сохраняется при масштабировании.
+Контракт и ограничения: [runtime-workers](docs/architecture/runtime-workers.md).
+
 ## Извлечение .osu из локальных .osz
 
 После `uv sync --locked` можно подготовить предоставленные локальные карты:
@@ -284,6 +300,8 @@ M2 — [пакетный импорт через очередь](docs/architectu
 версионируемые определения/методы, timing/slider geometry и будущие ML providers,
 мягкий budget около 30 s и возможные GPU stages. Это архитектурный план, не уже
 реализованные классификаторы или измеренная производительность.
+CPU runtime queue и регулируемая capacity worker уже работают на basic pipeline;
+новый difficulty engine и tag providers подключаются следующими срезами M3.
 Начните новую сессию с [AGENTS.md](AGENTS.md) и состояния Git.
 Архитектура: [overview](docs/architecture/overview.md), [БД](docs/architecture/database.md).
 Изменения продукта: [CHANGELOG.md](CHANGELOG.md); история решений: [devlog](docs/devlog/README.md).

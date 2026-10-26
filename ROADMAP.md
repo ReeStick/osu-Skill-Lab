@@ -8,7 +8,7 @@
 | 1 — Beatmap Analysis MVP | Локальная `.osu` → проверка входа → измеряемые признаки → сохранённый результат через REST | Завершён 2026-10-25; вход временный, metadata и результаты постоянные |
 | 1a — osu! API integration | Metadata/identity загруженной карты, checksum verification, OAuth, cache/rate limits | Завершён 2026-10-25; живая сверка и повторное чтение проверены |
 | 2 — Batch Import & Background Processing | Пакет ID → mirror metadata/raw files → RabbitMQ/worker → результаты по каждому элементу; retry и временные исходники | Завершён 2026-10-26: durable jobs, retry/cancel, shared mirror budget; живой batch проверен |
-| 3 — Feature Engineering | Versioned difficulty/pp components, собственные признаки, tag providers/definitions и сегменты | Проектирование: ADR-0004/0008, мягкий budget 30 s и GPU capability; runtime не начат |
+| 3 — Feature Engineering | Versioned difficulty/pp components, собственные признаки, tag providers/definitions и сегменты | В работе: CPU runtime queue/worker capacity готовы; engine/tags/GPU впереди |
 | 4 — Skill Classification | Размеченный набор, baseline, оценка ошибок и ограничений; ML только при достаточных данных | Не начат |
 | 5 — Tournament Pool Classification | Контекст турнира, multi-label слоты, история разметки, поиск | Не начат |
 | 6 — Public Release | Интерфейс, эксплуатация, мониторинг, развёртывание, публичная документация | Не начат |
@@ -62,3 +62,5 @@ throughput проверяются отдельно, достигнутые по�
 Контракт: [tag-pipeline](docs/architecture/tag-pipeline.md),
 [ADR-0008](docs/adr/0008-extensible-tags-and-compute-budget.md),
 критерии: [M3](docs/milestones/003-feature-engineering.md).
+Первый runtime срез: [runtime-workers](docs/architecture/runtime-workers.md),
+одна очередь и мощность worker 1..32 по [ADR-0009](docs/adr/0009-worker-concurrency.md).

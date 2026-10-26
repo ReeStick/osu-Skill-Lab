@@ -15,8 +15,13 @@ class JobMessage(BaseModel):
 
 
 class RabbitBroker:
-    def __init__(self, url: str, *, queue_name: str = "osu.analysis-items.v1") -> None:
+    def __init__(
+        self, url: str, *, queue_name: str = "osu.analysis-items.v1", prefetch_count: int = 1
+    ) -> None:
+        if not 1 <= prefetch_count <= 32:
+            raise ValueError("Prefetch count must be between 1 and 32")
         self._url, self.queue_name = url, queue_name
+        self.prefetch_count = prefetch_count
         self.connection: AbstractConnection
         self.channel: AbstractChannel
         self.queue: AbstractQueue
@@ -27,7 +32,7 @@ class RabbitBroker:
             self.channel = await self.connection.channel(
                 publisher_confirms=True, on_return_raises=True
             )
-            await self.channel.set_qos(prefetch_count=1)
+            await self.channel.set_qos(prefetch_count=self.prefetch_count)
             self.queue = await self.channel.declare_queue(
                 self.queue_name,
                 durable=True,

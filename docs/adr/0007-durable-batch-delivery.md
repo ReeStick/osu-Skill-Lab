@@ -3,6 +3,7 @@
 Status: Accepted
 Date: 2026-10-25
 Refines: ADR-0006, lifecycle section of batch-import
+Partially superseded: one-map worker capacity in decision 6 by ADR-0009
 
 ## Context
 

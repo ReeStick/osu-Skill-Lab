@@ -8,6 +8,19 @@ from osu_skill_lab.config import Settings
 DATABASE_URL = "postgresql+asyncpg://user:private-password@localhost/osu_skill_lab"
 
 
+@pytest.mark.parametrize("capacity", [0, -1, 33])
+def test_worker_capacity_is_bounded(capacity: int) -> None:
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, database_url=SecretStr(DATABASE_URL), worker_concurrency=capacity)
+
+
+def test_worker_capacity_default_and_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("OSU_LAB_WORKER_CONCURRENCY", raising=False)
+    assert Settings(_env_file=None, database_url=SecretStr(DATABASE_URL)).worker_concurrency == 1
+    monkeypatch.setenv("OSU_LAB_WORKER_CONCURRENCY", "4")
+    assert Settings(_env_file=None, database_url=SecretStr(DATABASE_URL)).worker_concurrency == 4
+
+
 def test_database_url_is_required() -> None:
     with pytest.raises(ValidationError, match="database_url"):
         Settings(_env_file=None)

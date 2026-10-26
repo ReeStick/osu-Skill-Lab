@@ -4,8 +4,23 @@
 **Milestone 1 — Beatmap Analysis MVP завершён** (2026-10-25).
 **M1a — osu! API metadata/identity завершён** (2026-10-25), включая живую OAuth-сверку.
 **M2 — Batch Import & Background Processing завершён** (2026-10-26).
-Текущий этап — проектирование M3: versioned difficulty engine и расширяемые теги.
-Runtime SR/pp/tag registry/ML/GPU ещё не реализован.
+Текущий этап — M3: работает CPU runtime foundation с configurable worker capacity.
+SR/pp engine, tag registry и ML/GPU ещё не реализованы.
+
+## Первый runtime срез M3 — очередь и мощность worker
+
+- [x] Общая durable runtime queue M2; один item/job на карту, отдельный worker процесс.
+- [x] Worker concurrency 1..32 через env/CLI; default 1, отдельная настройка на машине.
+- [x] Одно N для broker prefetch, handler/import slots и CPU processes.
+- [x] Per-ID import gates, parallel different maps, bounded cache/admission.
+- [x] TaskGroup shutdown/redelivery и fatal CPU restart, прежние leases/retry/budget.
+- [x] PostgreSQL/RabbitMQ проверки двух consumers capacity 1+2, CPU results и shutdown.
+- [x] Docker build/start с capacity 3 и живой batch двух IDs completed.
+- [ ] Следующий срез: точный difficulty provider/component coverage и provenance/DDL.
+
+Контракт: [runtime-workers](docs/architecture/runtime-workers.md),
+[ADR-0009](docs/adr/0009-worker-concurrency.md),
+проверки: [devlog](docs/devlog/2026-10-26-runtime-worker-concurrency.md).
 
 ## Уточнение M3 — определения тегов и compute budget
 

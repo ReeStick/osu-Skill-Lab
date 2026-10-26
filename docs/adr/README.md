@@ -12,6 +12,8 @@
 - [0006 — Пакетный импорт и зеркала](0006-mirror-batch-import.md), заменяет пункт 6 ADR-0005.
 - [0007 — Долговечные jobs, доставка и временный input](0007-durable-batch-delivery.md).
 - [0008 — Расширяемые теги и compute budget M3](0008-extensible-tags-and-compute-budget.md).
+- [0009 — Общая runtime queue и мощность worker](0009-worker-concurrency.md),
+  заменяет ограничение worker capacity в пункте 6 ADR-0007.
 
 ## Шаблон
 

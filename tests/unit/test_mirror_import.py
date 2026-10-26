@@ -17,6 +17,56 @@ def service_for() -> tuple[MirrorImportService, AsyncMock, AsyncMock]:
     return service, api, analyses
 
 
+@pytest.mark.parametrize(("admitted", "running"), [(0, 1), (33, 1), (2, 0), (1, 2)])
+def test_import_capacity_configuration_is_validated(admitted: int, running: int) -> None:
+    api = AsyncMock(spec=HinamizawaClient)
+    analyses = AsyncMock(spec=AnalysisService)
+    with pytest.raises(ValueError):
+        MirrorImportService(
+            cast(HinamizawaClient, api),
+            cast(AnalysisService, analyses),
+            max_in_flight=admitted,
+            max_concurrent=running,
+        )
+
+
+async def test_parallel_imports_release_slots_after_cancellation() -> None:
+    api = AsyncMock(spec=HinamizawaClient)
+    analyses = AsyncMock(spec=AnalysisService)
+    service = MirrorImportService(
+        cast(HinamizawaClient, api),
+        cast(AnalysisService, analyses),
+        max_in_flight=2,
+        max_concurrent=2,
+    )
+    entered: set[int] = set()
+    full = asyncio.Event()
+
+    async def resolve(ids: list[int]) -> None:
+        entered.add(ids[0])
+        if len(entered) == 2:
+            full.set()
+        await asyncio.Event().wait()
+
+    api.resolve_ids.side_effect = resolve
+    tasks = [asyncio.create_task(service.import_id(item)) for item in (1, 2)]
+    try:
+        async with asyncio.timeout(2):
+            await full.wait()
+        with pytest.raises(MirrorError) as busy:
+            await service.import_id(3)
+        assert busy.value.code == "mirror_busy"
+    finally:
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+    api.resolve_ids.side_effect = MirrorError("mirror_not_found", "Not found")
+    for item in (1, 2, 3):
+        with pytest.raises(MirrorError) as retry:
+            await service.import_id(item)
+        assert retry.value.code == "mirror_not_found"
+
+
 @pytest.mark.parametrize("kind", ["missing", "unresolved"])
 async def test_metadata_issue_keeps_absence_distinct_from_retry(kind: str) -> None:
     service, api, analyses = service_for()
