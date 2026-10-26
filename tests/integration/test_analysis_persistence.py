@@ -291,6 +291,9 @@ async def test_actual_schema_has_only_digest_bytes_and_configuration_json(
                     "analysis_results",
                     "osu_beatmap_matches",
                     "beatmap_sources",
+                    "analysis_batches",
+                    "analysis_jobs",
+                    "provider_budgets",
                 )
             }
         )
@@ -321,5 +324,9 @@ async def test_actual_schema_has_only_digest_bytes_and_configuration_json(
         ("analysis_results", "configuration_sha256"),
         ("osu_beatmap_matches", "source_md5"),
         ("beatmap_sources", "metadata_md5"),
+        ("analysis_batches", "request_sha256"),
+        ("analysis_batches", "configuration_sha256"),
+        ("analysis_jobs", "expected_sha256"),
+        ("analysis_jobs", "observed_sha256"),
     }
     assert json_columns == {("analysis_results", "configuration")}

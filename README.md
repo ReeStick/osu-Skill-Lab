@@ -9,9 +9,11 @@ difficulty или PP и будут развиваться отдельно.
 в отдельных процессах, REST upload и сохранение результатов в PostgreSQL.
 Постоянно хранятся компактные metadata, checksums и скалярные результаты;
 загруженный файл и разобранные объекты используются только в памяти.
-Skill profile, турнирные слоты и надёжная очередь заданий — следующие этапы.
+Skill profile и турнирные слоты — следующие этапы.
 В M1a добавлена явная сверка загруженной карты с metadata osu! API по checksum.
 Первый срез M2 добавил raw import из Hinamizawa и отдельное хранение происхождения файла.
+M2 завершён: пакетные задания сохраняются в PostgreSQL и исполняются через RabbitMQ
+отдельным worker с retry/cancel и получением прогресса.
 
 На M0 проверены установка из lock, 25 тестов (включая PostgreSQL), Ruff,
 mypy, миграции и запуск Docker API. Подробности и реальные неудачные попытки —
@@ -94,10 +96,34 @@ Invoke-RestMethod -Method Post http://localhost:8000/imports/hinamizawa/1960574
 provider, версии адаптера, checksum и времена наблюдений. Официальная сверка
 в `beatmap.osu` остаётся независимой. Опциональный `expected_sha256` фиксирует bytes.
 
-Сценарий пока ждёт результат в HTTP. Долговечные batch jobs/worker ещё не реализованы.
+Этот endpoint ждёт результат в HTTP; для фонового пакета используйте API ниже.
 Контракт и ограничения: [mirror-import](docs/architecture/mirror-import.md).
 Живая загрузка одной `.osu` 112 844 bytes и повтор/GET проверены:
 [devlog M2](docs/devlog/2026-10-25-hinamizawa-import.md).
+
+## Пакетный анализ в фоне
+
+Запустите `docker compose up --build --wait api dispatcher worker`, затем:
+
+```powershell
+$key = [guid]::NewGuid().ToString()
+$body = @{items=@(@{beatmap_id=1960574}, @{beatmap_id=658127})} | ConvertTo-Json -Depth 4
+$batch = Invoke-RestMethod -Method Post http://localhost:8000/analysis-batches -ContentType application/json -Headers @{'Idempotency-Key'=$key} -Body $body
+Invoke-RestMethod "http://localhost:8000/analysis-batches/$($batch.id)"
+```
+
+202 подтверждает сохранённое задание. До 100 entries, одинаковые ID/pin удаляются;
+на item можно передать `expected_sha256`. Повтор с тем же key/body возвращает тот же
+пакет; другой body — 409. Ответ содержит статус, attempts и analysis ID каждого item,
+частичная ошибка сохраняет успешные результаты. Отмена:
+`POST /analysis-batches/{id}/cancel`. До 1000 unfinished jobs; перегрузка — 429.
+
+При недоступном broker задания остаются в БД до восстановления dispatcher/worker.
+Bytes только RAM; retry повторяет загрузку с observed SHA-256, поэтому историческая
+редакция должна оставаться доступной у зеркала. Официальная сверка независима,
+автоматического переключения с official API на mirror нет. Контракт:
+[batch-processing](docs/architecture/batch-processing.md), проверенный живой batch:
+[devlog](docs/devlog/2026-10-26-durable-batch-processing.md).
 
 ## Извлечение .osu из локальных .osz
 
@@ -141,14 +167,14 @@ hit objects. Аудио, видео, фон, storyboard и samples не загр
 
 ```powershell
 Copy-Item .env.example .env
-docker compose up --build --wait api
+docker compose up --build --wait api dispatcher worker
 Invoke-RestMethod http://localhost:8000/health/live
 Invoke-RestMethod http://localhost:8000/health/ready
 ```
 
 На Linux/macOS вместо `Copy-Item` используйте `cp`, вместо `Invoke-RestMethod` — `curl --fail`.
-Compose дождётся PostgreSQL, выполнит миграции отдельным процессом и запустит API.
-Повторный `docker compose up --build --wait api` безопасен для уже применённой миграции.
+Compose дождётся PostgreSQL/RabbitMQ, выполнит миграции отдельным процессом и
+запустит API, dispatcher и worker. Повторный запуск безопасен для применённой миграции.
 
 - Swagger UI: <http://localhost:8000/docs>.
 - `GET /health/live` → `200 {"status":"ok"}` без подключения к БД.
@@ -200,6 +226,7 @@ uv run --locked pytest -m "not integration"
 ```powershell
 docker compose exec db createdb -U osu_lab osu_skill_lab_test
 $env:OSU_LAB_TEST_DATABASE_URL = "postgresql+asyncpg://osu_lab:osu_lab_local@localhost:5432/osu_skill_lab_test"
+$env:OSU_LAB_TEST_RABBITMQ_URL = "amqp://osu_lab:osu_lab_local@localhost:5672/"
 uv run --locked pytest
 ```
 
@@ -208,6 +235,9 @@ uv run --locked pytest
 Без неё интеграционные тесты явно пропускаются; с недоступной или некорректной БД — падают.
 Тестовый пользователь должен иметь право `CREATE SCHEMA` в тестовой БД.
 Случайные схемы `test_<uuid>` удаляются после тестов; не направляйте тесты на рабочие данные.
+RabbitMQ tests требуют `docker compose up -d --wait rabbitmq` и переменную
+`OSU_LAB_TEST_RABBITMQ_URL`. Без неё delivery tests skip; очереди тестов имеют
+случайные имена `test.<uuid>` и удаляются после проверки.
 
 ## Миграции
 
@@ -221,6 +251,7 @@ uv run --locked alembic check
 `0002_compact_analysis` добавляет `beatmap_inputs` и `analysis_results`,
 `0003_osu_metadata` — `osu_beatmap_matches` для выбранной внешней metadata.
 `0004_sources` добавляет `beatmap_sources` с версионируемыми download observations.
+`0005_batch_jobs` добавляет `analysis_batches`, `analysis_jobs` и `provider_budgets`.
 При добавлении моделей импортируйте их в `migrations/env.py`, создавайте
 `uv run --locked alembic revision --autogenerate -m "description"` и проверяйте SQL
 и downgrade вручную. `create_all()` при старте API не используется.
@@ -229,7 +260,7 @@ uv run --locked alembic check
 ## Структура и история
 
 ```text
-src/osu_skill_lab/       factory, config, CLI, api/, application/, analysis/, infrastructure/
+src/osu_skill_lab/       factory, config, CLI, api/, application/, analysis/, infrastructure/, workers/
 migrations/             Alembic env, template, versioned revisions
 tests/unit/             reader, features, extraction, CLI, HTTP, capacity and cancellation
 tests/integration/      real PostgreSQL, concurrency, migrations and full upload flow
@@ -244,9 +275,8 @@ docs/articles/          source material for future technical publications
 
 Следующие шаги и ограничения: [TASKS.md](TASKS.md), [ROADMAP.md](ROADMAP.md).
 M1a — osu! API metadata/identity завершён с живой OAuth-проверкой.
-Текущий этап — M2: [пакетный импорт через зеркала](docs/architecture/batch-import.md)
-с очередью и результатами по каждой карте. Adapter/single-file import и provenance
-уже работают; durable batch endpoint/jobs/worker — следующий срез.
+M2 — [пакетный импорт через очередь](docs/architecture/batch-processing.md) завершён.
+Следующий этап — M3: versioned difficulty engine, затем собственные признаки.
 Для дальнейших метрик принят [контракт эволюции](docs/architecture/metric-evolution.md):
 официальный difficulty/pp — первая основа, точные версии вычислителей и отдельные
 семейства результатов; собственные показатели добавляются позднее.

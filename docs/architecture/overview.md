@@ -68,9 +68,10 @@ claims; есть TTL, pacing и bounded HTTP. Контракт: [osu-api](osu-ap
 CPU-сценарию. Source observations сохраняются атомарно с result; официальный
 match не присваивается по mirror metadata. Контракт: [mirror-import](mirror-import.md).
 
-`domain/` и `workers/` появятся при соответствующих сценариях. Analysis не
+`domain/` появится при соответствующем сценарии; `workers/` реализован на M2. Analysis не
 импортирует FastAPI или SQLAlchemy. Надёжность фоновых заданий не обеспечивается
-`BackgroundTasks`; delivery/retry/staging будут определены на M2.
+`BackgroundTasks`; delivery/retry и RAM input определены в
+[batch-processing](batch-processing.md) и ADR-0007.
 
 ## Семантика анализа
 
@@ -91,8 +92,8 @@ difficulty и score-dependent performance развиваются отдельн�
 ## Компромиссы
 
 PostgreSQL обязателен для интеграционных тестов; это сложнее in-memory SQLite,
-зато проверяет реальный драйвер, транзакции и миграции. Нет Redis, RabbitMQ и
-численных библиотек до сценария, которому они нужны. Нет пользовательской auth
+зато проверяет реальный драйвер, транзакции и миграции. RabbitMQ добавлен на M2;
+Redis и численных библиотек пока нет. Нет пользовательской auth
 наших endpoints и публичного развёртывания. Внешний OAuth служит только public
-metadata lookup; Hinamizawa single-file download работает, durable batch ещё нет.
+metadata lookup; Hinamizawa single-file download и durable batch работают.
 Локальные порты — loopback.

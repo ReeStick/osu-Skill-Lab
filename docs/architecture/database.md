@@ -163,8 +163,9 @@ Reader и вычисления завершаются до открытия тр
 конкурентных импортах одной комбинации. Они не гарантируют единственное
 выполнение CPU-расчёта: конкуренты могут независимо посчитать одинаковые
 признаки. Поле `created` в результате сохранения означает новую строку анализа.
-Надёжная очередь, retry/lease/outbox и долговечные состояния заданий относятся
-к следующему срезу M2 и здесь не реализованы.
+Долговечные retry/lease/outbox и состояния заданий M2 описаны в
+[batch-processing](batch-processing.md); result и job success — две транзакции,
+поэтому повтор CPU после crash возможен, уникальность результата сохраняется.
 
 ## Повторный анализ после освобождения входа
 
@@ -213,5 +214,9 @@ SQLite и `create_all()` эти проверки не подменяют.
 В первом срезе M2 provenance уже реализован в `beatmap_sources`.
 Download provider и официальный checksum verification
 не взаимозаменяемы; `osu_beatmap_matches` не принимает mirror metadata как данные
-официального API. Таблицы durable batch/jobs пока не созданы.
-Проект: [batch-import](batch-import.md).
+официального API. Revision `0005_batch_jobs` добавила ещё три таблицы:
+`analysis_batches` (UUID key/request hash/pipeline identity), `analysis_jobs`
+(один item/job, state/attempts/run_after/delivery_after/lease/pins/result/error),
+`provider_budgets` (общий Hinamizawa pacing/cooldown). Только типизированные поля,
+без payload JSON/source bytes/object arrays. Job rows содержат последнее состояние,
+не журнал попыток. Контракт: [batch-processing](batch-processing.md).

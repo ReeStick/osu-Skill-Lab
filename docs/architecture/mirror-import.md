@@ -2,7 +2,7 @@
 
 Первый срез M2 реализует адаптер и законченный HTTP-сценарий загрузка → CPU-анализ →
 транзакция input/result/source → чтение. Batch metadata поддержана адаптером;
-долговечные batch jobs, broker и worker ещё не реализованы.
+долговечный сценарий M2 описан отдельно в [batch-processing](batch-processing.md).
 
 ```powershell
 Invoke-RestMethod -Method Post http://localhost:8000/imports/hinamizawa/1960574
@@ -12,7 +12,7 @@ Invoke-RestMethod -Method Post http://localhost:8000/imports/hinamizawa/1960574
 versioned анализа или 200 для переиспользованного. Опциональный query
 `expected_sha256` — ровно 64 lowercase hex символа, для фиксации точных bytes.
 ID — difficulty, не set. Это отдельный endpoint; будущий `POST /analysis-batches`
-с ответом 202 пока отсутствует.
+с ответом 202 реализован отдельно и не меняет ожидание этого endpoint.
 
 ## Получение и проверка входа
 
@@ -63,6 +63,8 @@ claimed IDs не переписываются.
 redirects выключены, credentials/cookies официального API не передаются.
 User-Agent — `osu-skill-lab/0.1.0`. Metadata response ограничен 2 MiB.
 429/503/transport failure включают cooldown, `Retry-After` поддерживает seconds/date.
+После завершения M2 реальные HTTP дополнительно используют общий PostgreSQL
+Hinamizawa pacing/cooldown для API и workers; cache/admission по-прежнему локальны.
 Одна metadata/file HTTP-операция имеет общий timeout; pacing — 1.05 s между запросами.
 
 Client кеширует metadata/issues до 256 ID (issues на 60 s), успех — на TTL.
@@ -77,8 +79,9 @@ Client кеширует metadata/issues до 256 ID (issues на 60 s), успе
 CPU-процесс удерживает свой analysis slot до завершения по существующему контракту.
 
 Файлов на диске нет, raw bytes живут в памяти на время импорта. Если запрос/процесс
-завершился до сохранения, долговечного retry нет. Disk staging, jobs и shared
-provider budgets относятся к следующему срезу M2.
+завершился до сохранения, для этого синхронного endpoint долговечного retry нет.
+Jobs и shared provider budgets реализованы в [batch-processing](batch-processing.md); disk staging
+заменён RAM retry с SHA pin по ADR-0007.
 
 Ошибки metadata/файла дают структурированный `detail` с code/message/retryable:
 404 missing, 409 checksum missing/mismatch, 422 unsupported mode/encoding или

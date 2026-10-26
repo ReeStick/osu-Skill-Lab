@@ -8,7 +8,7 @@ from collections import OrderedDict
 from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Protocol
 
 import httpx
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, ValidationError
@@ -56,6 +56,11 @@ class BatchResponse(BaseModel):
     results: list[MetadataRow] = Field(max_length=100)
 
 
+class RequestBudget(Protocol):
+    async def wait_turn(self) -> None: ...
+    async def pause(self, seconds: int) -> None: ...
+
+
 class HinamizawaClient:
     def __init__(
         self,
@@ -65,12 +70,14 @@ class HinamizawaClient:
         http: httpx.AsyncClient | None = None,
         clock: Callable[[], float] = time.monotonic,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+        budget: RequestBudget | None = None,
     ) -> None:
         self.timeout, self.cache_ttl = timeout, cache_ttl
         self.http = http or httpx.AsyncClient(
             timeout=timeout, trust_env=False, follow_redirects=False
         )
         self._clock, self._sleep = clock, sleep
+        self._budget = budget
         self._lock = asyncio.Lock()
         self._next_request_at = 0.0
         self._blocked_until = 0.0
@@ -107,7 +114,7 @@ class HinamizawaClient:
                     params={"ids": ",".join(map(str, pending))},
                 )
                 if status != 200:
-                    self._blocked_until = self._clock() + 60
+                    await self._pause(60)
                     raise MirrorError(
                         "mirror_unavailable",
                         "Mirror metadata unavailable",
@@ -151,7 +158,7 @@ class HinamizawaClient:
                             identifier, "unresolved", parsed.unresolved.reason
                         )
                 except (ValidationError, ValueError):
-                    self._blocked_until = self._clock() + 60
+                    await self._pause(60)
                     raise MirrorError(
                         "mirror_bad_response", "Invalid mirror metadata response"
                     ) from None
@@ -246,6 +253,8 @@ class HinamizawaClient:
                 retry_after=max(1, math.ceil(self._blocked_until - now)),
             )
         await self._sleep(max(0, self._next_request_at - now))
+        if self._budget is not None:
+            await self._budget.wait_turn()
         self._next_request_at = self._clock() + 1.05
         try:
             async with asyncio.timeout(self.timeout):
@@ -258,7 +267,7 @@ class HinamizawaClient:
                 ) as response:
                     if response.status_code in {429, 503}:
                         delay = _retry_after(response.headers.get("Retry-After"))
-                        self._blocked_until = self._clock() + delay
+                        await self._pause(delay)
                         code = (
                             "mirror_rate_limited"
                             if response.status_code == 429
@@ -279,18 +288,23 @@ class HinamizawaClient:
                         buffer.extend(chunk)
                     return response.status_code, bytes(buffer), response.headers
         except asyncio.CancelledError:
-            self._blocked_until = self._clock() + 60
+            await self._pause(60)
             raise
         except (httpx.TimeoutException, TimeoutError):
-            self._blocked_until = self._clock() + 60
+            await self._pause(60)
             raise MirrorError(
                 "mirror_timeout", "Mirror request timed out", retryable=True, retry_after=60
             ) from None
         except httpx.HTTPError:
-            self._blocked_until = self._clock() + 60
+            await self._pause(60)
             raise MirrorError(
                 "mirror_unavailable", "Mirror unavailable", retryable=True, retry_after=60
             ) from None
+
+    async def _pause(self, seconds: int) -> None:
+        self._blocked_until = max(self._blocked_until, self._clock() + seconds)
+        if self._budget is not None:
+            await self._budget.pause(seconds)
 
 
 def _header(headers: httpx.Headers, name: str, maximum: int) -> str | None:

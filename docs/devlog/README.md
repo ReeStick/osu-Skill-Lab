@@ -13,6 +13,7 @@
 - [2026-10-25 — OAuth и сверка checksum с osu! API](2026-10-25-osu-api-verification.md).
 - [2026-10-25 — План batch import через зеркала](2026-10-25-mirror-batch-plan.md).
 - [2026-10-25 — Адаптер Hinamizawa и import provenance](2026-10-25-hinamizawa-import.md).
+- [2026-10-26 — Долговечные batch jobs и RabbitMQ worker](2026-10-26-durable-batch-processing.md).
 
 ## Шаблон
 

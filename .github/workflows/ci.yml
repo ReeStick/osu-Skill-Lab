@@ -25,6 +25,16 @@ jobs:
   postgres:
     runs-on: ubuntu-latest
     services:
+      rabbitmq:
+        image: rabbitmq:4-alpine
+        env:
+          RABBITMQ_DEFAULT_USER: osu_lab
+          RABBITMQ_DEFAULT_PASS: ci_local_only
+        ports:
+          - 5672:5672
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 5s --health-timeout 5s --health-retries 20
       postgres:
         image: postgres:17-bookworm
         env:
@@ -39,6 +49,7 @@ jobs:
     env:
       OSU_LAB_DATABASE_URL: postgresql+asyncpg://osu_lab:ci_local_only@127.0.0.1:5432/osu_skill_lab_test
       OSU_LAB_TEST_DATABASE_URL: postgresql+asyncpg://osu_lab:ci_local_only@127.0.0.1:5432/osu_skill_lab_test
+      OSU_LAB_TEST_RABBITMQ_URL: amqp://osu_lab:ci_local_only@127.0.0.1:5672/
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
@@ -56,7 +67,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: docker compose up --build --wait api
+      - run: docker compose up --build --wait api dispatcher worker
       - run: curl --fail http://127.0.0.1:8000/health/live
       - run: curl --fail http://127.0.0.1:8000/health/ready
       - run: >-

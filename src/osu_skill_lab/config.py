@@ -26,6 +26,21 @@ class Settings(BaseSettings):
     osu_cache_ttl_seconds: int = Field(default=3600, ge=60, le=86400)
     mirror_timeout_seconds: float = Field(default=20.0, gt=0, le=30)
     mirror_cache_ttl_seconds: int = Field(default=600, ge=60, le=86400)
+    rabbitmq_url: SecretStr = SecretStr("amqp://osu_lab:osu_lab_local@127.0.0.1:5672/")
+
+    @field_validator("rabbitmq_url")
+    @classmethod
+    def validate_rabbitmq_url(cls, value: SecretStr) -> SecretStr:
+        from urllib.parse import urlsplit
+
+        try:
+            url = urlsplit(value.get_secret_value())
+            valid = url.scheme in {"amqp", "amqps"} and url.hostname and url.port != 0
+        except ValueError:
+            valid = False
+        if not valid:
+            raise ValueError("RABBITMQ_URL must be an amqp/amqps URL with a host")
+        return value
 
     @field_validator("osu_client_id", "osu_client_secret", mode="before")
     @classmethod

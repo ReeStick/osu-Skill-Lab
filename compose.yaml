@@ -14,8 +14,25 @@ x-app: &app
     OSU_LAB_OSU_CACHE_TTL_SECONDS: ${OSU_LAB_OSU_CACHE_TTL_SECONDS:-3600}
     OSU_LAB_MIRROR_TIMEOUT_SECONDS: ${OSU_LAB_MIRROR_TIMEOUT_SECONDS:-20}
     OSU_LAB_MIRROR_CACHE_TTL_SECONDS: ${OSU_LAB_MIRROR_CACHE_TTL_SECONDS:-600}
+    OSU_LAB_RABBITMQ_URL: amqp://${RABBITMQ_USER:-osu_lab}:${RABBITMQ_PASSWORD:-osu_lab_local}@rabbitmq:5672/
 
 services:
+  rabbitmq:
+    image: rabbitmq:4-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-osu_lab}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-osu_lab_local}
+    ports:
+      - "127.0.0.1:${RABBITMQ_PORT:-5672}:5672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
   db:
     image: postgres:17-bookworm
     environment:
@@ -55,5 +72,27 @@ services:
       retries: 3
       start_period: 5s
 
+  dispatcher:
+    <<: *app
+    command: ["python", "-m", "osu_skill_lab.workers", "dispatcher"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    <<: *app
+    command: ["python", "-m", "osu_skill_lab.workers", "worker"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+    stop_grace_period: 30s
+
 volumes:
   postgres_data:
+  rabbitmq_data:

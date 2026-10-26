@@ -8,5 +8,5 @@
 - [M1a — osu! API metadata/identity](001a-osu-api.md): завершён с локальными
   тестами и живой OAuth-сверкой одной карты.
 - [M2 — Batch Import & Background Processing](002-batch-background.md):
-  в работе; adapter/single-file import готовы, batch jobs/queue впереди.
+  завершён: durable batch, RabbitMQ/worker, retry/cancel и живой импорт двух IDs.
 - Остальные этапы пока только в [ROADMAP](../../ROADMAP.md).

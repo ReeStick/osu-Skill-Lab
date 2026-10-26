@@ -1,13 +1,13 @@
 import asyncio
 import time
 from collections import OrderedDict
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from osu_skill_lab.application.contracts import SaveAnalysisOutcome
 from osu_skill_lab.application.service import AnalysisService
-from osu_skill_lab.application.sources import MirrorError
+from osu_skill_lab.application.sources import MirrorError, SourceReceipt
 from osu_skill_lab.infrastructure.hinamizawa import HinamizawaClient
 
 
@@ -40,6 +40,7 @@ class MirrorImportService:
         beatmap_id: int,
         *,
         expected_sha256: str | None = None,
+        before_analysis: Callable[[SourceReceipt], Awaitable[None]] | None = None,
     ) -> SaveAnalysisOutcome:
         try:
             self._tokens.get_nowait()
@@ -94,6 +95,8 @@ class MirrorImportService:
                         self._cache.move_to_end(beatmap_id)
                         return SaveAnalysisOutcome(record, False)
                 downloaded = await self.api.download(metadata, expected_sha256=expected_sha256)
+                if before_analysis is not None:
+                    await before_analysis(downloaded.receipt)
 
                 async def chunks() -> AsyncIterator[bytes]:
                     yield downloaded.data

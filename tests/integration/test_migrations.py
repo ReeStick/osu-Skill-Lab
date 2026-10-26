@@ -29,10 +29,13 @@ def exercise_migrations(connection: Connection) -> None:
     assert MigrationContext.configure(connection).get_current_revision() == head
     assert sorted(inspect(connection).get_table_names()) == [
         "alembic_version",
+        "analysis_batches",
+        "analysis_jobs",
         "analysis_results",
         "beatmap_inputs",
         "beatmap_sources",
         "osu_beatmap_matches",
+        "provider_budgets",
     ]
 
 

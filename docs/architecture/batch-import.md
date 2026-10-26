@@ -1,6 +1,6 @@
 # Пакетный импорт карт из зеркал
 
-Status: Accepted design; adapter/single-file import implemented, durable batch not implemented
+Status: Implemented; runtime and recovery contract in batch-processing
 Date: 2026-10-25
 
 ## Проверенный контракт кандидата
@@ -17,13 +17,15 @@ Date: 2026-10-25
 Batch response различает `missing` и `unresolved`: последнее не означает отсутствие
 карты. Документирован предел 10 upstream MD5 lookups на один batch. Часть запросов
 может обращаться к официальному upstream, поэтому зеркало не гарантирует успех
-во время его перегрузки. Здесь проверена документация, не фактические ответы API.
+во время его перегрузки. Первоначальный проект проверял документацию; позднее
+подтверждены живые metadata/raw и batch. Фактический контракт:
+[batch-processing](batch-processing.md).
 
 ## Наш batch-сценарий M2
 
-Один запрос клиента будет создавать пакет до 100 difficulty IDs. Предлагаемый
-endpoint — `POST /analysis-batches`, ответ 202 с `batch_id`; это пока проект,
-его нет в текущем OpenAPI. Set IDs должны передаваться отдельным явным сценарием:
+Один запрос клиента создаёт пакет до 100 difficulty IDs. Endpoint —
+`POST /analysis-batches`, ответ 202 с `id`; он доступен в OpenAPI.
+Set IDs должны передаваться отдельным явным сценарием:
 численно похожие IDs нельзя автоматически считать difficulty IDs.
 
 ```mermaid
@@ -41,10 +43,10 @@ flowchart LR
 Наш batch является координацией нескольких операций. Он не обещает скачать
 произвольные `.osu` одним upstream response. Начальная стратегия — batch metadata,
 затем отдельные raw `.osu` с ограниченной конкуренцией; медиа/`.osz` не нужны.
-После принятия задания клиент сможет получить статус каждого элемента и analysis ID.
+После принятия задания клиент получает статус каждого элемента и analysis ID.
 Ошибка одной карты не откатывает успешно обработанные элементы.
 
-При реализации нужны dedup IDs внутри запроса, защита повторной постановки,
+Реализованы dedup IDs внутри запроса, защита повторной постановки,
 ограничение общего объёма работ и числа одновременно скачиваемых файлов.
 Фиксация намерения job по ID не фиксирует исторические байты: желаемый checksum
 нужно задавать явно, если требуется конкретная редакция. После скачивания
@@ -65,12 +67,12 @@ Downloader и metadata lookup — отдельные адаптеры с явн�
 
 Текущий `verify-osu` сохраняет только наблюдение настоящего osu! API. Mirror metadata
 нельзя записывать в `osu_beatmap_matches` как официальный match. Для первого
-mirror-сценария потребуются DTO/миграция provenance: provider, requested ID,
+mirror-сценария добавлены DTO/миграция provenance: provider, requested ID,
 время получения, hashes, известная свежесть и источник связи с картой. Download
 source и identity verification source могут различаться. Ответ с зеркала сам
 по себе не получает официальный статус `checksum_match`.
 
-Если официальный checksum уже известен, скачанные байты проверяются против него.
+Если свежий официальный checksum уже известен, скачанные байты проверяются против него.
 При несовпадении результат для ожидаемой редакции не создаётся. Без официального
 подтверждения сохраняются provider claims и явный статус происхождения; ID из
 файла не превращается в доказанный внешний ключ. Разные bytes под одним ID дают
@@ -84,12 +86,13 @@ source и identity verification source могут различаться. Отв
 добавляются молча. Raw bytes/hash считаются до любых преобразований.
 
 Скачивание выполняется по мере готовности worker, а не всего пакета в RAM.
-Временный staging живёт до завершения нужных retry, затем очищается. После
-аварии orphan staging должен убираться по TTL. В PostgreSQL — jobs, provenance,
+Первоначальный disk staging заменён RAM input по ADR-0007: перед CPU job хранит
+observed SHA-256, на retry выполняется новый полный GET с этим pin. Source files
+и orphan staging не создаются. В PostgreSQL — jobs, provenance,
 metadata и результаты, без raw files/objects. После удаления исходника ETag/304
 не заменяют bytes: для нового расчёта нужны доступный staging либо полный GET.
 
-При реализации проверяются: частичный batch, `unresolved`, 404/429/503, timeout,
+Проверены: частичный batch, `unresolved`, 404/429/503, timeout,
 несовпадение checksum/ID, некорректный body, повторная доставка и падение worker.
 Metadata cache учитывает provider/freshness; старый или неразрешённый ответ не
 объявляется подтверждённым отсутствием карты. Для зеркал задаются свой pacing,
@@ -107,4 +110,5 @@ bounded responses и User-Agent проекта. Allowlist hosts/redirect policy 
 Решение: [ADR-0006](../adr/0006-mirror-batch-import.md).
 Первый срез реализован: metadata adapter, raw single-file import и `beatmap_sources`.
 Контракт: [mirror-import](mirror-import.md). Durable batch endpoint/jobs/queue
-ещё не реализованы; схема выше описывает целевой полный сценарий M2.
+реализованы: [batch-processing](batch-processing.md), доставка/leases и отказ от
+disk staging: [ADR-0007](../adr/0007-durable-batch-delivery.md).

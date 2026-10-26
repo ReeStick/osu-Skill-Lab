@@ -49,15 +49,20 @@ checksum; file IDs не являются fallback. Выбранная metadata �
 `fetched_at`, не гарантию текущей редакции. Claims и features не обновляются.
 `OSU_LAB_OSU_CLIENT_ID/SECRET` опциональны вместе; не печатайте credentials,
 OAuth responses или `docker compose config` с секретами. Нет eager OAuth на старте.
-Лимиты HTTP/cache действуют на один процесс: перед масштабированием нужен общий
-бюджет запросов. Контракт и ограничения download: `docs/architecture/osu-api.md`.
+Лимиты official HTTP/cache действуют на один процесс: перед масштабированием
+verify-osu нужен общий бюджет запросов. Hinamizawa использует общий PostgreSQL
+pacing/cooldown для API/workers. Контракт: `docs/architecture/osu-api.md`.
 
 Первый прикладной сценарий M2 — batch import через явно выбранные sources.
 Проект: `docs/architecture/batch-import.md`, ADR-0006. Mirror metadata/download
 не подменяют официальный `verify-osu`; бюджеты/cooldowns источников отдельные.
 Первый срез уже работает: `POST /imports/hinamizawa/{id}`, один HTTP import с
-ожиданием результата, source observations в `beatmap_sources`. Будущего batch 202
-endpoint/очереди пока нет. Контракт: `docs/architecture/mirror-import.md`.
+ожиданием результата, source observations в `beatmap_sources`.
+Batch уже работает: POST/GET `/analysis-batches`, Idempotency-Key UUID, per-item
+states/cancel, PostgreSQL outbox/leases, RabbitMQ dispatcher и worker. Raw bytes
+только RAM; retry повторяет GET с observed SHA-256 pin. Disk staging не создаётся.
+Контракты: `docs/architecture/batch-processing.md`, ADR-0007. Автоматического
+official→mirror fallback нет; sources по-прежнему выбираются явно.
 
 ## Команды из корня
 
@@ -72,13 +77,15 @@ uv run --locked mypy
 uv run --locked pytest
 uv run --locked osu-skill-lab extract-osz tests/unlabeled_osu_maps
 uv run --locked osu-skill-lab inspect-osu data/unpacked_osu_maps --recursive
-docker compose up --build --wait api
+docker compose up --build --wait api dispatcher worker
 ```
 
 Сначала скопируйте `.env.example` в `.env`, если файла ещё нет. Не затирайте
 существующий `.env`. Интеграционные тесты требуют переменную процесса
 `OSU_LAB_TEST_DATABASE_URL`, БД с суффиксом `_test`, права создания схем;
 инструкция в README. Без переменной они skip, это не проверка PostgreSQL.
+RabbitMQ delivery tests дополнительно требуют `OSU_LAB_TEST_RABBITMQ_URL`;
+без неё соответствующие проверки skip, это не проверка broker.
 
 В исходной среде Windows `git.exe` доступен по
 `C:\Program Files\Git\cmd\git.exe`, но отсутствовал в PATH. Вспомогательный uv

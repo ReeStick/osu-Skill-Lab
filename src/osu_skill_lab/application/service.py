@@ -39,6 +39,10 @@ class AnalysisUnavailableError(RuntimeError):
     pass
 
 
+class AnalysisProcessUnavailableError(AnalysisUnavailableError):
+    pass
+
+
 class AnalysisService:
     def __init__(self, database: Database, executor: Executor, *, max_in_flight: int = 2) -> None:
         if max_in_flight < 1:
@@ -89,7 +93,7 @@ class AnalysisService:
                     raise
             except (BrokenProcessPool, RuntimeError) as exc:
                 logger.warning("Analysis process unavailable (%s)", type(exc).__name__)
-                raise AnalysisUnavailableError("Analysis process unavailable") from None
+                raise AnalysisProcessUnavailableError("Analysis process unavailable") from None
             finally:
                 data.clear()
             if isinstance(prepared, PreparationFailure):

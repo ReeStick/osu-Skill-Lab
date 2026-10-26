@@ -7,7 +7,7 @@
 | 0 — Project Foundation | Установка по lock, API, реальная БД, миграции, тесты, CI, документация | Завершён 2026-10-25; CI настроен, удалённо не запускался |
 | 1 — Beatmap Analysis MVP | Локальная `.osu` → проверка входа → измеряемые признаки → сохранённый результат через REST | Завершён 2026-10-25; вход временный, metadata и результаты постоянные |
 | 1a — osu! API integration | Metadata/identity загруженной карты, checksum verification, OAuth, cache/rate limits | Завершён 2026-10-25; живая сверка и повторное чтение проверены |
-| 2 — Batch Import & Background Processing | Пакет ID → mirror metadata/raw files → RabbitMQ/worker → результаты по каждому элементу; retry и временные исходники | В работе: adapter и импорт одной difficulty с provenance проверены; jobs/queue впереди |
+| 2 — Batch Import & Background Processing | Пакет ID → mirror metadata/raw files → RabbitMQ/worker → результаты по каждому элементу; retry и временные исходники | Завершён 2026-10-26: durable jobs, retry/cancel, shared mirror budget; живой batch проверен |
 | 3 — Feature Engineering | Сначала versioned osu! difficulty engine и upstream метрики, затем собственные определения, тесты и сегменты | Не начат; контракт эволюции принят в ADR-0004 |
 | 4 — Skill Classification | Размеченный набор, baseline, оценка ошибок и ограничений; ML только при достаточных данных | Не начат |
 | 5 — Tournament Pool Classification | Контекст турнира, multi-label слоты, история разметки, поиск | Не начат |
@@ -30,7 +30,7 @@ NumPy, SciPy, rosu-pp-py, HTTPX в runtime, RabbitMQ и Redis добавляют
 Download `.osz` в документации помечен lazer и недоступен обычному client credentials
 grant. Для M2 выбран кандидат Hinamizawa: batch metadata и отдельные raw `.osu`.
 Adapter и endpoint импорта одной difficulty реализованы и проверены на живом файле.
-Доступны локальный upload и raw mirror import; долговечный batch сценарий ещё впереди.
+Доступны локальный upload, raw mirror import и долговечный batch через очередь.
 Контракт: [osu-api](docs/architecture/osu-api.md).
 
 Предложение владельца превращает M2 в прикладной batch-сценарий: durable items,
@@ -40,6 +40,8 @@ Mirror fallback сохраняет provider provenance и официальный
 решение: [ADR-0006](docs/adr/0006-mirror-batch-import.md),
 критерии: [M2](docs/milestones/002-batch-background.md).
 Первый рабочий срез: [mirror-import](docs/architecture/mirror-import.md).
+Полный M2: [batch-processing](docs/architecture/batch-processing.md),
+доставка и RAM input на retry: [ADR-0007](docs/adr/0007-durable-batch-delivery.md).
 
 Уточнение владельца на M1: постоянно хранятся только metadata и результаты,
 исходник существует во время обработки. Для M2 потребуется определить временный

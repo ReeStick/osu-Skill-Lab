@@ -3,8 +3,24 @@
 **Milestone 0 — Project Foundation завершён** (2026-10-25).
 **Milestone 1 — Beatmap Analysis MVP завершён** (2026-10-25).
 **M1a — osu! API metadata/identity завершён** (2026-10-25), включая живую OAuth-сверку.
-Текущий этап — M2: готов первый срез Hinamizawa import/provenance;
-долговечные batch jobs и очередь ещё впереди.
+**M2 — Batch Import & Background Processing завершён** (2026-10-26).
+Следующий этап — M3: versioned difficulty engine по ADR-0004; расчёт SR/pp ещё не реализован.
+
+## Завершение M2 — долговечные пакеты и worker
+
+- [x] POST/GET `/analysis-batches`, UUID Idempotency-Key, 100 IDs, dedup/pins и cancel.
+- [x] `0005_batch_jobs`: batch/jobs, bounded admission, outbox intent и provider budget.
+- [x] RabbitMQ persistent/confirmed notifications, отдельные dispatcher/worker, fenced leases.
+- [x] Пять попыток с backoff/Retry-After, partial success, expired leases и duplicate delivery.
+- [x] Общий Hinamizawa pacing/cooldown для API и workers; официальный verify независим.
+- [x] SHA-256 фиксируется до CPU и проверяется на retry; bytes только RAM, disk staging не нужен.
+- [x] Algorithm/parser/config identity при acceptance; несовместимый pipeline не подменяется.
+- [x] Целевые PostgreSQL/RabbitMQ/CPU проверки и Docker запуск; независимые unit пропущены.
+- [x] Живой batch: два уникальных IDs, оба succeeded; analysis №1 переиспользован.
+
+Решение: [ADR-0007](docs/adr/0007-durable-batch-delivery.md).
+Контракт: [batch-processing](docs/architecture/batch-processing.md).
+Проверки: [devlog](docs/devlog/2026-10-26-durable-batch-processing.md).
 
 ## Последний срез M2 — рабочий mirror import
 
@@ -15,7 +31,7 @@
 - [x] Fresh known official checksum проверяется до download; mirror не создаёт official match.
 - [x] 111 уникальных целевых cases проверены несколькими прогонами; независимые unit пропущены.
 - [x] Docker и живой import одной `.osu` 112 844 bytes; SHA pin совпал, analysis №1 переиспользован.
-- [ ] Durable batch/items/jobs, RabbitMQ/worker, staging/retry и общий provider budget.
+- [x] Durable batch/jobs, RabbitMQ/worker, RAM input/retry и общий provider budget.
 
 Контракт: [mirror-import](docs/architecture/mirror-import.md).
 Проверки: [devlog](docs/devlog/2026-10-25-hinamizawa-import.md).
@@ -30,7 +46,7 @@
 - [x] Пункт 6 ADR-0005 частично заменён: mirror разрешён как самостоятельный источник,
   текущий официальный OAuth/verify-osu на него не перенаправляется.
 - [x] Реализовать download adapter и HTTP import одной difficulty.
-- [ ] Реализовать M2 batch endpoint, durable jobs и worker.
+- [x] Реализовать M2 batch endpoint, durable jobs и worker.
 
 Проект: [batch-import](docs/architecture/batch-import.md).
 Проверки: [devlog](docs/devlog/2026-10-25-mirror-batch-plan.md).
@@ -163,16 +179,14 @@
 On-demand file import выделяется отдельно после проверки подходящего источника;
 автоматическое скачивание архива обычным API-токеном не предполагается.
 
-## После M1a — задачи M2
+## Выполненные задачи M2
 
-1. Определить batch/items/AnalysisJob, состояния и временный staging; добавить
-   `POST /analysis-batches` и получение прогресса/результата по каждому элементу.
-2. Принять ADR RabbitMQ delivery/ack/retry, отдельного worker и атомарной постановки.
-   Подтверждать HTTP acceptance только после долговечного сохранения задания.
-3. Проверить частичный batch, повторную доставку, падение worker, checksum mismatch,
-   отсутствие/ограничения upstream, очистку staging и отсутствие дубликатов.
-4. Сохранить version/config/input identity и ограничение постоянного хранения;
-   после retry staging очищается, parsed objects не переносятся в PostgreSQL.
+1. Batch/items представлены batch и job rows; 202 следует после commit acceptance.
+2. ADR-0007 определяет outbox intent, RabbitMQ confirms/ACK, leases и отдельный worker.
+3. Проверены partial batch, redelivery, lease recovery, checksum mismatch, retry/cancel.
+4. Версии/pins сохранены; RAM input заменяет disk staging, без source files/objects в БД.
+
+## Следующий этап M3
 
 До gameplay-признаков M3 нужны effective timing/SV, slider traversal,
 нормализация координат, stacking и mods; текущие измерения намеренно raw.
@@ -186,14 +200,14 @@ On-demand file import выделяется отдельно после пров�
 - Контейнеры закреплены по версиям/веткам, не по digest; lock фиксирует Python
   зависимости, но не даёт побитовую воспроизводимость ОС. Потребуется политика обновлений.
 - CI настроен, но удалённый запуск не подтверждён до разрешённого push.
-- Нет долговечной очереди и автоматического восстановления сломанного process pool:
-  `BrokenProcessPool` даёт 503 до перезапуска экземпляра API. Состояния/retry — M2.
+- `BrokenProcessPool` в HTTP даёт 503 до перезапуска API. Worker сохраняет retry,
+  выходит с ошибкой и пересоздаётся Compose restart policy; локальный CLI нужно перезапустить.
 - Повтор upload может заново выполнить CPU-расчёт; дедуплицируется сохранение.
-- Живая official checksum-сверка и mirror download подтверждены для одной карты;
-  массовый batch API и долговечный импорт пока не реализованы.
-- Pacing/cache/cooldown пока локальны одному API-процессу; общий client ID при
+- Живая official checksum-сверка подтверждена для одной карты, mirror batch для двух;
+  batch API и долговечный импорт реализованы; автоматического official→mirror fallback нет.
+- Official pacing/cache/cooldown локальны одному API-процессу; общий client ID при
   масштабировании потребует распределённого бюджета запросов.
-- После освобождения входа новый анализ требует повторного upload точных байтов;
+- После освобождения входа новый анализ требует upload либо повторного GET точных байтов;
   доступность исторической версии на сайте не гарантируется.
 
 Решения: [ADR](docs/adr/README.md). Исследований пока нет:

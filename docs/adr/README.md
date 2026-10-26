@@ -10,6 +10,7 @@
 - [0004 — Версии вычислителей и семейства метрик](0004-versioned-metric-families.md).
 - [0005 — Явная сверка и metadata osu! API](0005-osu-checksum-metadata.md).
 - [0006 — Пакетный импорт и зеркала](0006-mirror-batch-import.md), заменяет пункт 6 ADR-0005.
+- [0007 — Долговечные jobs, доставка и временный input](0007-durable-batch-delivery.md).
 
 ## Шаблон
 

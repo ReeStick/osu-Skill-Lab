@@ -6,7 +6,7 @@ from dataclasses import asdict, dataclass
 
 from osu_skill_lab.analysis.features import ALGORITHM_VERSION, BasicFeatures, extract_basic_features
 from osu_skill_lab.analysis.models import DifficultySettings, ParserLimits
-from osu_skill_lab.analysis.parser import BeatmapParseError, parse_osu
+from osu_skill_lab.analysis.parser import PARSER_VERSION, BeatmapParseError, parse_osu
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,6 +43,21 @@ class PreparationFailure:
     line_number: int | None = None
 
 
+def analysis_configuration() -> tuple[dict[str, object], bytes]:
+    configuration: dict[str, object] = {
+        "ruleset": 0,
+        "mods": [],
+        "coordinate_space": "raw",
+        "parser_limits": asdict(ParserLimits()),
+    }
+    canonical = json.dumps(configuration, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    return configuration, hashlib.sha256(canonical.encode("utf-8")).digest()
+
+
+def pipeline_identity() -> tuple[str, str, bytes]:
+    return ALGORITHM_VERSION, PARSER_VERSION, analysis_configuration()[1]
+
+
 def prepare_analysis(data: bytes) -> PreparedAnalysis | PreparationFailure:
     """Snapshot bytes are temporary; neither bytes nor parsed object arrays are returned."""
     try:
@@ -61,13 +76,7 @@ def prepare_analysis(data: bytes) -> PreparedAnalysis | PreparationFailure:
             return PreparationFailure(
                 "metadata_too_long", f"Metadata {name} exceeds {maximum} characters"
             )
-    configuration: dict[str, object] = {
-        "ruleset": 0,
-        "mods": [],
-        "coordinate_space": "raw",
-        "parser_limits": asdict(limits),
-    }
-    canonical = json.dumps(configuration, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    configuration, configuration_sha256 = analysis_configuration()
     return PreparedAnalysis(
         bytes.fromhex(beatmap.source_sha256),
         hashlib.md5(data, usedforsecurity=False).digest(),
@@ -86,6 +95,6 @@ def prepare_analysis(data: bytes) -> PreparedAnalysis | PreparationFailure:
         beatmap.parser_version,
         ALGORITHM_VERSION,
         configuration,
-        hashlib.sha256(canonical.encode("utf-8")).digest(),
+        configuration_sha256,
         extract_basic_features(beatmap),
     )

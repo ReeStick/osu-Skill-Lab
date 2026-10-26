@@ -9,6 +9,11 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from osu_skill_lab.config import Settings
 from osu_skill_lab.infrastructure.database import Base
+from osu_skill_lab.infrastructure.job_models import (  # noqa: F401
+    AnalysisBatch,
+    AnalysisJob,
+    ProviderBudget,
+)
 from osu_skill_lab.infrastructure.models import (  # noqa: F401
     AnalysisResult,
     BeatmapInput,

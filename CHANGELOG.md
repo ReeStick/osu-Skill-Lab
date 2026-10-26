@@ -6,6 +6,9 @@
 
 ### Added
 
+- Долговечные пакеты `POST/GET /analysis-batches`, Idempotency-Key, per-item status,
+  checksum pins и cancel; RabbitMQ dispatcher/worker с leases и ограниченными retry.
+- Общий Hinamizawa pacing/cooldown в PostgreSQL, RAM-only input с SHA pin на retry.
 - Hinamizawa metadata batch adapter и `POST /imports/hinamizawa/{beatmap_id}`:
   raw download с checksum/SHA pin, независимая provenance, cache и source limits.
 - Явная сверка сохранённого анализа с osu! API: OAuth public lookup по checksum,
