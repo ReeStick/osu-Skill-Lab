@@ -17,6 +17,7 @@
 - [2026-10-26 — Архитектура тегов и compute budget M3](2026-10-26-tag-pipeline-design.md).
 - [2026-10-26 — Runtime queue и worker capacity](2026-10-26-runtime-worker-concurrency.md).
 - [2026-10-26 — Гибридный workbench разметки](2026-10-26-label-workbench.md).
+- [2026-10-26 — Передача контекста в новый чат](2026-10-26-chat-handoff.md).
 
 ## Шаблон
 
