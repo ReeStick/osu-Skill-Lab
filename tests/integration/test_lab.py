@@ -19,6 +19,7 @@ from osu_skill_lab.application.preparation import PreparedAnalysis, prepare_anal
 from osu_skill_lab.config import Settings
 from osu_skill_lab.infrastructure.analysis_repository import save_analysis
 from osu_skill_lab.infrastructure.lab_models import LabLabelEvent, LabModelExample
+from osu_skill_lab.infrastructure.models import AnalysisResult
 from osu_skill_lab.main import create_app
 
 pytestmark = pytest.mark.integration
@@ -59,6 +60,55 @@ async def lab_app(
     async with app.router.lifespan_context(app):
         app.state.database.session_factory.configure(bind=migrated_engine)
         yield app
+
+
+async def test_map_labels_read_latest_independent_tags_without_changing_decisions(
+    lab_app: FastAPI, migrated_engine: AsyncEngine
+) -> None:
+    ids = await seed(migrated_engine, count=2)
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=lab_app), base_url="http://test"
+    ) as client:
+        path = f"/lab/api/analyses/{ids[0]}/labels"
+        assert (await client.get(path)).json() == {}
+        tags = [
+            (await client.post("/lab/api/tags", json={"name": name, "description": name})).json()[
+                "id"
+            ]
+            for name in ("Timing", "Geometry")
+        ]
+        labels = {}
+        for tag in tags:
+            response = await client.post(
+                f"/lab/api/tags/{tag}/labels",
+                json={"analysis_id": ids[0], "value": "yes"},
+            )
+            assert response.status_code == 201
+            labels[tag] = response.json()
+        assert (await client.get(path)).json() == labels
+        assert (await client.get(f"/lab/api/analyses/{ids[1]}/labels")).json() == {}
+        # Removing one assigned chip means unreviewed, never an implicit negative.
+        response = await client.post(
+            f"/lab/api/tags/{tags[0]}/labels",
+            json={
+                "analysis_id": ids[0],
+                "value": "unreviewed",
+                "expected_event_id": labels[tags[0]]["id"],
+            },
+        )
+        assert response.status_code == 201
+        labels[tags[0]] = response.json()
+        assert (await client.get(path)).json() == labels
+        async with async_sessionmaker(migrated_engine)() as session:
+            assert await session.scalar(select(func.count()).select_from(LabLabelEvent)) == 3
+        for bad in (0, -1, 2**63):
+            assert (await client.get(f"/lab/api/analyses/{bad}/labels")).status_code == 422
+        assert (await client.get("/lab/api/analyses/999999/labels")).status_code == 404
+        async with async_sessionmaker(migrated_engine)() as session:
+            old = await session.scalar(
+                select(AnalysisResult.id).where(AnalysisResult.algorithm_version == "basic-raw/old")
+            )
+        assert (await client.get(f"/lab/api/analyses/{old}/labels")).status_code == 404
 
 
 async def test_workbench_end_to_end_preserves_decisions_versions_and_model_lineage(

@@ -102,6 +102,16 @@ async def latest_labels(
     return {row.input_id: label_view(row) for row in rows}
 
 
+async def input_labels(session: AsyncSession, input_id: int) -> dict[UUID, LabelView]:
+    rows = await session.scalars(
+        select(LabLabelEvent)
+        .where(LabLabelEvent.input_id == input_id)
+        .distinct(LabLabelEvent.tag_id)
+        .order_by(LabLabelEvent.tag_id, LabLabelEvent.id.desc())
+    )
+    return {row.tag_id: label_view(row) for row in rows}
+
+
 async def dataset_rows(
     session: AsyncSession,
     tag_id: UUID | None,

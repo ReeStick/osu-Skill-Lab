@@ -5,6 +5,7 @@ from typing import Annotated, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import Path as PathParameter
 from fastapi.responses import FileResponse
 
 from osu_skill_lab.application.lab_contracts import (
@@ -84,6 +85,14 @@ async def dataset(
 async def label(tag_id: UUID, body: LabelWrite, service: Service) -> LabelView:
     async with _errors():
         return await service.label(tag_id, body)
+
+
+@router.get("/api/analyses/{analysis_id}/labels", response_model=dict[UUID, LabelView])
+async def map_labels(
+    analysis_id: Annotated[int, PathParameter(gt=0, le=2**63 - 1)], service: Service
+) -> dict[UUID, LabelView]:
+    async with _errors():
+        return await service.map_labels(analysis_id)
 
 
 @router.get("/api/tags/{tag_id}/rules", response_model=list[RuleView])

@@ -9,7 +9,13 @@ export function scoreManual(features, rule) {
     if (!weight) continue;
     const value = features[key],
       scale = rule.normalizer.scales[key];
-    if (value === null || value === undefined || !Number.isFinite(scale) || scale <= 0) return null;
+    if (
+      value === null ||
+      value === undefined ||
+      !Number.isFinite(scale) ||
+      scale <= 0
+    )
+      return null;
     z += (weight * (value - rule.normalizer.means[key])) / scale;
   }
   return sigmoid(z);
@@ -27,6 +33,41 @@ export function scoreModel(features, model) {
     z += model.coefficients[j + n] * Number(missing);
   }
   return sigmoid(z);
+}
+
+// Exact additive terms in the linear score, before sigmoid. These are local
+// contributions for one map, not causal or global feature importance.
+export function explainScore(features, rule, model = null) {
+  const base = model ? model.intercept : rule.bias || 0;
+  const keys = model ? model.feature_keys : Object.keys(rule.weights || {});
+  const terms = [];
+  for (const [index, key] of keys.entries()) {
+    const weight = model ? model.coefficients[index] : rule.weights[key];
+    const missingWeight = model ? model.coefficients[index + keys.length] : 0;
+    if (!weight && !missingWeight) continue;
+    const raw = features[key];
+    const missing = raw === null || raw === undefined;
+    if (missing && !model) return { base, terms: [], score: null };
+    const value = missing ? model.medians[key] : raw;
+    const normalizer = model || rule.normalizer;
+    const scale = normalizer.scales[key];
+    if (!Number.isFinite(scale) || scale <= 0)
+      return { base, terms: [], score: null };
+    terms.push({
+      key,
+      missing,
+      contribution:
+        (weight * (value - normalizer.means[key])) / scale +
+        missingWeight * Number(missing),
+    });
+  }
+  return {
+    base,
+    terms,
+    score: sigmoid(
+      base + terms.reduce((sum, term) => sum + term.contribution, 0),
+    ),
+  };
 }
 
 export function confusion(rows, scores, threshold) {
@@ -62,6 +103,8 @@ export function confusion(rows, scores, threshold) {
 
 export function evaluate(rows, specification, artifact = null) {
   return rows.map((row) =>
-    artifact ? scoreModel(row.features, artifact) : scoreManual(row.features, specification),
+    artifact
+      ? scoreModel(row.features, artifact)
+      : scoreManual(row.features, specification),
   );
 }

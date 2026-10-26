@@ -151,6 +151,15 @@ class LabService:
             await session.flush()
             return repository.label_view(event)
 
+    async def map_labels(self, analysis_id: int) -> dict[UUID, LabelView]:
+        async with self._session() as session:
+            rows, _ = await repository.dataset_rows(
+                session, None, limit=1, analysis_ids=[analysis_id]
+            )
+            if not rows:
+                raise LabNotFound("Совместимый анализ не найден")
+            return await repository.input_labels(session, rows[0].input_id)
+
     async def rules(self, tag_id: UUID) -> list[RuleView]:
         async with self._session() as session:
             await self._tag(session, tag_id)

@@ -1,4 +1,4 @@
-import { confusion } from './score-core.js';
+import { confusion, explainScore } from './score-core.js';
 
 const $ = (id) => document.getElementById(id);
 const state = {
@@ -7,7 +7,7 @@ const state = {
   data: null,
   selected: null,
   scores: [],
-  mode: 'label',
+  mode: 'rule',
   rules: [],
   models: [],
   model: null,
@@ -21,6 +21,10 @@ const state = {
   training: false,
   undo: null,
   visibleLimit: 200,
+  mapLabels: new Map(),
+  labelRequests: new Map(),
+  labelsGeneration: 0,
+  mapLabelError: null,
 };
 const worker = new Worker('/lab/assets/preview-worker.js', { type: 'module' });
 let previewTimer, toastTimer;
@@ -73,11 +77,86 @@ async function api(path, options = {}) {
   }
   return value;
 }
-const selectedRow = () => state.data?.rows.find((row) => row.analysis_id === state.selected);
+const selectedRow = () =>
+  state.data?.rows.find((row) => row.analysis_id === state.selected);
 const labelValue = (row) => row.label?.value || 'unreviewed';
 const groupKey = (row) =>
   row.beatmap_set_id ? `set:${row.beatmap_set_id}` : `input:${row.sha256}`;
-const latestEvent = () => Math.max(0, ...(state.data?.rows.map((row) => row.label?.id || 0) || []));
+const latestEvent = () =>
+  Math.max(0, ...(state.data?.rows.map((row) => row.label?.id || 0) || []));
+const labelsReady = () => state.mapLabels.has(state.selected);
+const currentMapLabels = () => state.mapLabels.get(state.selected) || {};
+const formatNumber = (value) =>
+  Number.isFinite(value)
+    ? new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(value)
+    : '—';
+
+function setTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  $('theme-toggle').textContent = theme === 'dark' ? '☀ Светлая' : '☾ Тёмная';
+  $('theme-toggle').setAttribute(
+    'aria-label',
+    theme === 'dark' ? 'Включить светлую тему' : 'Включить тёмную тему',
+  );
+  renderHistogram();
+}
+let savedTheme;
+try {
+  savedTheme = localStorage.getItem('osu-lab-theme');
+} catch {
+  /* Storage can be disabled. */
+}
+setTheme(
+  ['light', 'dark'].includes(savedTheme)
+    ? savedTheme
+    : matchMedia('(prefers-color-scheme: dark)').matches
+      ? 'dark'
+      : 'light',
+);
+$('theme-toggle').onclick = () => {
+  const theme =
+    document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  setTheme(theme);
+  try {
+    localStorage.setItem('osu-lab-theme', theme);
+  } catch {
+    /* Theme still works for this page. */
+  }
+};
+
+async function loadMapLabels() {
+  const id = state.selected;
+  if (!id || state.mapLabels.has(id)) return;
+  if (state.labelRequests.has(id)) return state.labelRequests.get(id);
+  const generation = state.labelsGeneration;
+  state.mapLabelError = null;
+  const request = (async () => {
+    try {
+      const labels = await api(`/analyses/${id}/labels`);
+      if (generation !== state.labelsGeneration) return;
+      state.mapLabels.set(id, labels);
+      const row = state.data?.rows.find((item) => item.analysis_id === id);
+      if (row && state.tag) row.label = labels[state.tag.id] || null;
+    } catch (error) {
+      if (generation !== state.labelsGeneration) return;
+      if (id === state.selected) state.mapLabelError = id;
+      toast(error.message, true);
+    } finally {
+      if (generation === state.labelsGeneration) {
+        state.labelRequests.delete(id);
+        if (id === state.selected) renderAll();
+      }
+    }
+  })();
+  state.labelRequests.set(id, request);
+  renderSelected();
+  return request;
+}
+function selectMap(id) {
+  state.selected = id;
+  renderAll();
+  loadMapLabels();
+}
 
 function renderTags() {
   const list = $('tag-list');
@@ -90,13 +169,27 @@ function renderTags() {
     );
     button.append(element('span', tag.name));
     button.title = tag.description;
+    button.disabled = state.saving;
     button.onclick = () => chooseTag(tag);
     list.append(button);
   }
   if (!state.tags.length)
-    list.append(element('p', 'Пока нет тегов. Нажмите ＋ и опишите первый паттерн.', 'tag-empty'));
+    list.append(
+      element(
+        'p',
+        'Пока нет тегов. Нажмите ＋ и опишите первый паттерн.',
+        'tag-empty',
+      ),
+    );
+  $('label-tag-select').replaceChildren(
+    ...state.tags.map((tag) => new Option(tag.name, tag.id)),
+  );
+  $('label-tag-select').value = state.tag?.id || '';
+  $('label-tag-select').disabled =
+    state.loading || state.saving || !state.tags.length;
 }
 async function chooseTag(tag) {
+  clearTimeout(previewTimer);
   state.tag = tag;
   state.undo = null;
   state.model = null;
@@ -133,6 +226,10 @@ async function loadDataset() {
     ]);
     if (generation !== state.loadGeneration) return;
     state.data = data;
+    state.labelsGeneration++;
+    state.mapLabels.clear();
+    state.labelRequests.clear();
+    state.mapLabelError = null;
     state.rules = rules;
     state.models = models;
     state.model = null;
@@ -142,7 +239,9 @@ async function loadDataset() {
     if (!data.rows.some((row) => row.analysis_id === state.selected))
       state.selected = data.rows[0]?.analysis_id ?? null;
     state.manual = {
-      weights: Object.fromEntries(data.feature_catalog.map((feature) => [feature.key, 0])),
+      weights: Object.fromEntries(
+        data.feature_catalog.map((feature) => [feature.key, 0]),
+      ),
       bias: 0,
       normalizer: data.normalizer,
     };
@@ -150,8 +249,8 @@ async function loadDataset() {
     state.generation++;
     worker.postMessage({ type: 'dataset', rows: data.rows });
     $('dataset-status').textContent =
-      `${data.rows.length}${data.truncated ? '+' : ''} карт · ${data.profile.algorithm_version} · фичи в памяти`;
-    $('connection').textContent = 'Сохранено в PostgreSQL';
+      `${data.rows.length}${data.truncated ? '+' : ''} карт · ${data.profile.algorithm_version}`;
+    $('connection').textContent = 'Библиотека подключена';
     renderSources();
     renderRules();
     renderWeights();
@@ -168,7 +267,19 @@ async function loadDataset() {
       syncControls();
       renderSelected();
       renderLearning();
+      renderMultiTag();
+      loadMapLabels();
     }
+  }
+  if (generation !== state.loadGeneration || !state.data) return;
+  const saved = state.rules.find(
+    (rule) => rule.specification.profile_sha256 === state.data.profile_sha256,
+  );
+  if (saved) {
+    await loadRule(saved.id);
+    if (generation === state.loadGeneration) $('saved-rules').value = saved.id;
+  } else if (state.models.length) {
+    await selectModel(state.models[0].id);
   }
 }
 function renderSources() {
@@ -176,7 +287,10 @@ function renderSources() {
   select.replaceChildren(new Option('Ручное правило', 'manual'));
   for (const [index, model] of state.models.entries()) {
     select.add(
-      new Option(`Модель ${state.models.length - index} · ${model.train_count} примеров`, model.id),
+      new Option(
+        `Модель ${state.models.length - index} · ${model.train_count} примеров`,
+        model.id,
+      ),
     );
   }
   select.value = state.model?.id || 'manual';
@@ -184,7 +298,8 @@ function renderSources() {
 function renderRules() {
   const select = $('saved-rules');
   select.replaceChildren(new Option('Сохранённые версии…', ''));
-  for (const rule of state.rules) select.add(new Option(rule.specification.name, rule.id));
+  for (const rule of state.rules)
+    select.add(new Option(rule.specification.name, rule.id));
 }
 async function selectModel(id) {
   if (state.loading || !state.data) return;
@@ -251,30 +366,40 @@ function syncControls() {
   $('bias').value = state.manual?.bias || 0;
   $('bias-value').value = (state.manual?.bias || 0).toFixed(2);
   $('manual-controls').hidden = Boolean(state.model);
-  $('rule-panel').hidden = state.mode !== 'rule';
-  $('score-strip').hidden = state.mode !== 'rule';
-  $('feature-panel').hidden = state.mode === 'rule';
+  $('analytics-panel').hidden = state.mode !== 'rule';
+  $('label-panel').hidden = state.mode !== 'label';
+  $('label-tag-select').disabled =
+    state.loading || state.saving || !state.tags.length;
   $('prediction-mode').textContent =
     state.mode === 'label'
       ? 'Ручные решения'
       : state.model
         ? 'Обученная модель'
-        : 'Черновик правила';
-  $('save-rule').disabled = state.loading || !state.tag || !state.data?.rows.length;
+        : 'Ручное правило';
+  $('save-rule').disabled =
+    state.loading || !state.tag || !state.data?.rows.length;
   $('scoring-source').disabled = state.loading || !state.data;
   $('saved-rules').disabled = state.loading || !state.data;
+  $('refresh').disabled = state.loading || state.saving;
+  const disagree = $('filter').querySelector('[value="disagree"]');
+  disagree.disabled = state.mode === 'label';
+  for (const value of ['score', 'boundary'])
+    $('sort').querySelector(`[value="${value}"]`).disabled =
+      state.mode === 'label';
 }
 function schedulePreview() {
   if (!state.data || !state.manual) return;
   const generation = ++state.generation;
+  const specification = structuredClone(state.manual),
+    artifact = state.model?.artifact || null;
   clearTimeout(previewTimer);
   previewTimer = setTimeout(
     () =>
       worker.postMessage({
         type: 'evaluate',
         generation,
-        specification: state.manual,
-        artifact: state.model?.artifact || null,
+        specification,
+        artifact,
       }),
     35,
   );
@@ -286,7 +411,8 @@ worker.onmessage = ({ data }) => {
     `Скоринг ${data.elapsed < 1 ? '<1' : data.elapsed.toFixed(1)} ms${data.cacheHit ? ' · кеш' : ''}`;
   renderAll();
 };
-worker.onerror = () => toast('Предпросмотр не запустился. Обновите страницу.', true);
+worker.onerror = () =>
+  toast('Предпросмотр не запустился. Обновите страницу.', true);
 
 function displayedRows() {
   if (!state.data) return [];
@@ -297,7 +423,9 @@ function displayedRows() {
     .filter(({ row, score }) => {
       if (
         search &&
-        !`${row.title} ${row.artist} ${row.version}`.toLocaleLowerCase().includes(search)
+        !`${row.title} ${row.artist} ${row.version}`
+          .toLocaleLowerCase()
+          .includes(search)
       )
         return false;
       if (filter === 'validation') return row.label?.partition === 'validation';
@@ -322,90 +450,128 @@ function displayedRows() {
       break;
     case 'mixed':
       rows.sort(
-        (a, b) => ((a.row.input_id * 2654435761) >>> 0) - ((b.row.input_id * 2654435761) >>> 0),
+        (a, b) =>
+          ((a.row.input_id * 2654435761) >>> 0) -
+          ((b.row.input_id * 2654435761) >>> 0),
       );
       break;
   }
   return rows;
 }
 function renderTable() {
+  const focusedId = document.activeElement?.matches('.map-row')
+    ? document.activeElement.dataset.id
+    : null;
   const rows = displayedRows(),
     fragment = document.createDocumentFragment();
   for (const { row, score } of rows.slice(0, state.visibleLimit)) {
-    const tr = element(
-      'tr',
+    const button = element(
+      'button',
       undefined,
       'map-row' + (row.analysis_id === state.selected ? ' selected' : ''),
     );
-    tr.dataset.id = row.analysis_id;
-    tr.tabIndex = 0;
-    tr.setAttribute('aria-selected', row.analysis_id === state.selected);
-    const name = element('td');
+    button.dataset.id = row.analysis_id;
+    button.setAttribute('role', 'option');
+    button.setAttribute('aria-selected', row.analysis_id === state.selected);
+    button.tabIndex = row.analysis_id === state.selected ? 0 : -1;
+    const name = element('span');
     name.append(
       element('span', row.title || 'Без названия', 'map-name'),
-      element('span', `${row.artist} · ${row.version}`, 'map-sub'),
+      element('span', row.artist || 'Неизвестный артист', 'map-sub'),
     );
-    const label = element('td');
-    label.append(element('span', decisionNames[labelValue(row)], 'pill ' + labelValue(row)));
-    if (row.label?.partition === 'validation') label.append(element('span', 'К', 'control-mark'));
-    const output = element(
-      'td',
-      state.mode === 'rule' && score !== null ? score.toFixed(2) : '—',
-      'score' + (score !== null && score >= state.threshold ? ' passes' : ''),
+    const detail = element('span', undefined, 'map-difficulty');
+    detail.append(
+      element('span', row.version || 'Без difficulty'),
+      element(
+        'span',
+        decisionNames[labelValue(row)],
+        'pill ' + labelValue(row),
+      ),
     );
-    tr.append(name, label, output);
-    tr.onclick = () => {
-      state.selected = row.analysis_id;
-      renderAll();
-    };
-    tr.onkeydown = (event) => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        tr.click();
-      }
-    };
-    fragment.append(tr);
+    if (row.label?.partition === 'validation')
+      detail.append(element('span', 'К', 'control-mark'));
+    name.append(detail);
+    const rating = element('span', '★ —', 'map-rating');
+    rating.title = 'SR пока не рассчитан';
+    if (state.mode === 'rule' && state.tag && score !== null)
+      rating.append(element('span', score.toFixed(2), 'score'));
+    button.append(element('span', undefined, 'map-symbol'), name, rating);
+    button.onclick = () => selectMap(row.analysis_id);
+    fragment.append(button);
   }
   if (rows.length > state.visibleLimit) {
-    const tr = element('tr'),
-      td = element('td'),
-      button = element(
-        'button',
-        `Показать ещё · ${rows.length - state.visibleLimit} карт`,
-        'text-button',
-      );
-    td.colSpan = 3;
+    const button = element(
+      'button',
+      `Показать ещё · ${rows.length - state.visibleLimit} карт`,
+      'text-button',
+    );
     button.onclick = () => {
       state.visibleLimit += 200;
       renderTable();
     };
-    td.append(button);
-    tr.append(td);
-    fragment.append(tr);
+    fragment.append(button);
   }
   $('map-list').replaceChildren(fragment);
+  if (focusedId)
+    document
+      .querySelector(`.map-row[data-id="${focusedId}"]`)
+      ?.focus({ preventScroll: true });
   $('map-count').textContent = rows.length;
   $('empty').hidden = rows.length > 0;
-  if (state.data?.rows.length && !rows.length) {
-    $('empty').querySelector('h3').textContent = 'Нет карт по этому фильтру';
-    $('empty').querySelector('p').textContent = 'Измените поисковый запрос или состояние разметки.';
-  } else {
-    $('empty').querySelector('h3').textContent = 'Здесь появятся ваши карты';
-    $('empty').querySelector('p').textContent =
-      'Загрузите .osu или дождитесь завершения пакетного анализа.';
-  }
+  $('empty').querySelector('h3').textContent = state.data?.rows.length
+    ? 'Нет карт по этому фильтру'
+    : 'Здесь появятся ваши карты';
+  $('empty').querySelector('p').textContent = state.data?.rows.length
+    ? 'Измените поиск или фильтр разметки.'
+    : 'Добавьте .osu или дождитесь пакетного анализа.';
 }
 function renderSelected() {
   const row = selectedRow();
-  $('selected-title').textContent = row ? `${row.title} [${row.version}]` : 'Выберите карту';
+  $('selected-title').textContent = row?.title || 'Выберите карту';
+  $('selected-subtitle').textContent = row
+    ? `${row.artist} · ${row.version}`
+    : 'Ваша библиотека — справа.';
+  const stats = document.createDocumentFragment();
+  for (const [title, value] of [
+    [
+      'BPM (red)',
+      row
+        ? row.features.red_bpm_min === row.features.red_bpm_max
+          ? formatNumber(row.features.red_bpm_min)
+          : `${formatNumber(row.features.red_bpm_min)}–${formatNumber(row.features.red_bpm_max)}`
+        : '—',
+    ],
+    ['Объекты', row ? formatNumber(row.features.hit_object_count) : '—'],
+    ['Слайдеры', row ? formatNumber(row.features.slider_count) : '—'],
+    [
+      'Размах стартов',
+      row ? `${formatNumber(row.features.object_start_span_ms / 1000)} с` : '—',
+    ],
+  ]) {
+    const item = element('div', undefined, 'map-stat');
+    item.append(element('span', title), element('strong', value));
+    stats.append(item);
+  }
+  $('map-stats').replaceChildren(stats);
   $('validation').checked = row?.label?.partition === 'validation';
-  $('validation').disabled = !row || !state.tag || state.saving || state.loading;
+  const disabled =
+    !row || !state.tag || state.saving || state.loading || !labelsReady();
+  $('validation').disabled = disabled;
+  $('clear-label').disabled =
+    disabled || labelValue(row || {}) === 'unreviewed';
+  $('label-definition').textContent =
+    state.tag?.description || 'Создайте тег, чтобы начать разметку.';
   document.querySelectorAll('[data-label]').forEach((button) => {
-    button.disabled = !row || !state.tag || state.saving || state.loading;
+    button.disabled = disabled;
+    button.setAttribute(
+      'aria-pressed',
+      labelValue(row || {}) === button.dataset.label,
+    );
   });
-  $('undo').disabled = !state.undo || state.saving;
+  $('undo').disabled = !state.undo || state.saving || state.loading;
   $('map-link').hidden = !row?.beatmap_id;
-  if (row?.beatmap_id) $('map-link').href = `https://osu.ppy.sh/beatmaps/${row.beatmap_id}`;
+  if (row?.beatmap_id)
+    $('map-link').href = `https://osu.ppy.sh/beatmaps/${row.beatmap_id}`;
   const values = document.createDocumentFragment();
   for (const feature of state.data?.feature_catalog || []) {
     const value = row?.features[feature.key];
@@ -423,13 +589,194 @@ function renderSelected() {
   }
   $('feature-values').replaceChildren(values);
 }
+
+function renderMultiTag() {
+  const row = selectedRow(),
+    labels = currentMapLabels();
+  const disabled = !row || state.loading || state.saving || !labelsReady();
+  const palette = document.createDocumentFragment(),
+    assigned = document.createDocumentFragment(),
+    summary = document.createDocumentFragment();
+  for (const tag of state.tags) {
+    const label = labels[tag.id],
+      yes = label?.value === 'yes';
+    const chip = element(
+      'button',
+      undefined,
+      'tag-chip' + (yes ? ' assigned' : ''),
+    );
+    chip.dataset.tagId = tag.id;
+    chip.append(element('span', tag.name));
+    if (label && label.value !== 'unreviewed')
+      chip.append(element('small', decisionNames[label.value]));
+    chip.title = tag.description;
+    chip.disabled = disabled;
+    chip.draggable = !disabled;
+    chip.setAttribute('aria-pressed', yes);
+    chip.onclick = () => {
+      if (!yes) setLabel('yes', label?.partition || 'train', false, tag.id);
+    };
+    chip.ondragstart = (event) => {
+      if (disabled) {
+        event.preventDefault();
+        return;
+      }
+      event.dataTransfer.setData('application/x-osu-lab-tag', tag.id);
+      event.dataTransfer.effectAllowed = 'copy';
+    };
+    palette.append(chip);
+    if (yes) {
+      const item = element('span', undefined, 'assigned-tag');
+      const remove = element('button', '×');
+      remove.setAttribute('aria-label', `Снять тег «${tag.name}»`);
+      remove.disabled = disabled;
+      remove.onclick = () =>
+        setLabel('unreviewed', label.partition, false, tag.id);
+      item.append(element('span', tag.name), remove);
+      assigned.append(item);
+      summary.append(element('span', tag.name, 'mini-tag'));
+    }
+  }
+  $('tag-palette').replaceChildren(palette);
+  $('assigned-tags').replaceChildren(assigned);
+  $('selected-tags').replaceChildren(summary);
+  $('tag-dropzone').setAttribute('aria-busy', Boolean(row && !labelsReady()));
+  $('drop-hint').textContent = !row
+    ? 'Выберите карту в библиотеке'
+    : state.mapLabelError === state.selected
+      ? 'Не удалось прочитать метки. Обновите библиотеку.'
+      : !labelsReady()
+        ? 'Загружаем ваши метки…'
+        : !state.tags.length
+          ? 'Создайте первый тег'
+          : Object.values(labels).some((label) => label.value === 'yes')
+            ? '＋ Ещё один подходящий тег'
+            : 'Перетащите сюда подходящие теги';
+}
+
+function metricHistogram(key, value) {
+  const values = state.data.rows
+    .map((row) => row.features[key])
+    .filter(Number.isFinite);
+  const chart = element('span', undefined, 'mini-histogram');
+  chart.setAttribute('role', 'img');
+  chart.setAttribute(
+    'aria-label',
+    `Распределение метрики по ${values.length} картам; эта карта: ${Number.isFinite(value) ? formatNumber(value) : 'нет наблюдения'}`,
+  );
+  if (!values.length) {
+    chart.classList.add('no-marker');
+    return chart;
+  }
+  const min = Math.min(...values),
+    max = Math.max(...values),
+    span = max - min;
+  const bins = Array(14).fill(0);
+  for (const value of values)
+    bins[span ? Math.min(13, Math.floor(((value - min) / span) * 14)) : 7]++;
+  const peak = Math.max(1, ...bins);
+  for (const count of bins) {
+    const bar = element('i');
+    bar.style.height = `${(count / peak) * 100}%`;
+    chart.append(bar);
+  }
+  if (Number.isFinite(value))
+    chart.style.setProperty(
+      '--marker',
+      `${span ? Math.max(0, Math.min(99, ((value - min) / span) * 100)) : 50}%`,
+    );
+  else chart.classList.add('no-marker');
+  return chart;
+}
+
+function renderInfluence() {
+  const row = selectedRow();
+  $('contributions').replaceChildren();
+  if (!row || !state.tag || !state.manual) {
+    $('selected-score').textContent = '—';
+    $('score-verdict').textContent = state.tag
+      ? 'Выберите карту'
+      : 'Создайте тег';
+    $('influence-hint').textContent =
+      'Определите скилл и настройте правило на своих примерах.';
+    return;
+  }
+  const explanation = explainScore(
+    row.features,
+    state.manual,
+    state.model?.artifact,
+  );
+  const score = explanation.score;
+  $('selected-score').textContent = score === null ? '—' : score.toFixed(2);
+  const configured = Boolean(
+    state.model ||
+    Object.values(state.manual.weights).some(Boolean) ||
+    state.manual.bias,
+  );
+  $('score-verdict').textContent = !configured
+    ? 'Правило пока не настроено'
+    : score === null
+      ? 'Недостаточно наблюдений'
+      : `${score >= state.threshold ? 'Выше' : 'Ниже'} порога ${state.threshold.toFixed(2)}`;
+  const terms = [...explanation.terms].sort(
+    (a, b) => Math.abs(b.contribution) - Math.abs(a.contribution),
+  );
+  const top = terms.slice(0, 6),
+    scale = Math.max(0.001, ...top.map((term) => Math.abs(term.contribution)));
+  $('influence-hint').textContent =
+    score === null
+      ? 'Для активной метрики нет наблюдения. Правило не даёт оценку.'
+      : !terms.length
+        ? `Все веса нулевые: оценка одинакова для всех карт. Смещение: ${explanation.base.toFixed(2)}. Раскройте настройки ниже.`
+        : `Смещение: ${explanation.base.toFixed(2)}.${terms.length > 6 ? ` Показаны 6 из ${terms.length} вкладов; остальные входят в оценку.` : ''}`;
+  for (const term of top) {
+    const feature = state.data.feature_catalog.find(
+      (item) => item.key === term.key,
+    );
+    const entry = element('div', undefined, 'contribution');
+    const name = element('span', undefined, 'contribution-name');
+    name.append(
+      element('span', feature.title),
+      element(
+        'small',
+        term.missing
+          ? 'Нет наблюдения · median + missing indicator'
+          : `${formatNumber(row.features[term.key])} ${feature.unit}`,
+      ),
+    );
+    const meter = element('span', undefined, 'contribution-meter');
+    const bar = element(
+      'i',
+      undefined,
+      'contribution-bar' + (term.contribution < 0 ? ' negative' : ''),
+    );
+    const width = (Math.abs(term.contribution) / scale) * 48;
+    bar.style.width = `${width}%`;
+    bar.style.left = `${term.contribution >= 0 ? 50 : 50 - width}%`;
+    meter.append(
+      bar,
+      element(
+        'output',
+        `${term.contribution >= 0 ? '+' : ''}${term.contribution.toFixed(2)}`,
+      ),
+    );
+    entry.append(
+      name,
+      metricHistogram(term.key, row.features[term.key]),
+      meter,
+    );
+    $('contributions').append(entry);
+  }
+}
 function renderLearning() {
   const rows = state.data?.rows || [],
     counts = { yes: 0, no: 0, unsure: 0 };
   const controlGroups = new Set(
     rows
       .filter(
-        (row) => row.label?.partition === 'validation' && ['yes', 'no'].includes(labelValue(row)),
+        (row) =>
+          row.label?.partition === 'validation' &&
+          ['yes', 'no'].includes(labelValue(row)),
       )
       .map(groupKey),
   );
@@ -438,7 +785,10 @@ function renderLearning() {
   for (const row of rows) {
     const value = labelValue(row);
     if (value in counts) counts[value]++;
-    if (row.label?.partition !== 'validation' && !controlGroups.has(groupKey(row))) {
+    if (
+      row.label?.partition !== 'validation' &&
+      !controlGroups.has(groupKey(row))
+    ) {
       if (value === 'yes') yes++;
       if (value === 'no') no++;
     }
@@ -448,13 +798,16 @@ function renderLearning() {
   $('training-hint').textContent = state.training
     ? 'Обучение в отдельном CPU-процессе…'
     : `Для обучения: ${yes} «есть» и ${no} «нет». Минимум — по два вне контрольных сетов.`;
-  $('train-model').disabled = !state.tag || yes < 2 || no < 2 || state.training || state.loading;
-  $('train-model').textContent = state.training ? 'Модель обучается…' : 'Обучить модель';
+  $('train-model').disabled =
+    !state.tag || yes < 2 || no < 2 || state.training || state.loading;
+  $('train-model').textContent = state.training
+    ? 'Модель обучается…'
+    : 'Обучить модель';
   const stale = state.model && latestEvent() > state.model.latest_event_id;
   $('model-info').textContent = state.model
     ? `${state.model.train_count} обучающих · ${state.model.validation_count} контрольных · исключено ${state.model.excluded_same_set} карт связанных сетов.${stale ? ' Разметка обновилась — переобучите модель.' : ''}`
     : state.models.length
-      ? 'Выберите обученную версию в режиме «Правило и модель».'
+      ? 'Выберите обученную версию в настройках скилла.'
       : 'Модель ещё не обучена';
   const metrics = confusion(rows, state.scores, state.threshold);
   $('validation-metrics').textContent = stale
@@ -482,23 +835,39 @@ function renderHistogram() {
     }
   const max = Math.max(1, ...bins);
   bins.forEach((count, index) => {
-    ctx.fillStyle = (index + 0.5) / 32 >= state.threshold ? '#b59be7' : '#383342';
+    const colors = getComputedStyle(document.documentElement);
+    ctx.fillStyle = colors
+      .getPropertyValue(
+        (index + 0.5) / 32 >= state.threshold ? '--accent' : '--bar',
+      )
+      .trim();
     const h = (count / max) * 47;
-    ctx.fillRect((index * width) / 32, height - h, Math.max(1, width / 32 - 2), h);
+    ctx.fillRect(
+      (index * width) / 32,
+      height - h,
+      Math.max(1, width / 32 - 2),
+      h,
+    );
   });
-  ctx.fillStyle = '#eadbff';
+  ctx.fillStyle = getComputedStyle(document.documentElement)
+    .getPropertyValue('--text')
+    .trim();
   ctx.fillRect(Math.min(width - 1, state.threshold * width), 2, 1, height - 2);
-  $('matching').textContent = `${matching} карт`;
+  $('matching').textContent =
+    `${matching} карт выше порога ${state.threshold.toFixed(2)}`;
 }
 function renderAll() {
   renderTable();
   renderSelected();
   renderLearning();
   renderHistogram();
+  renderMultiTag();
+  renderInfluence();
   $('collection-hint').textContent =
     state.mode === 'label'
-      ? 'Решения человека сохраняются отдельно от прогнозов.'
-      : !state.model && !Object.values(state.manual?.weights || {}).some(Boolean)
+      ? `Решения по тегу «${state.tag?.name || '—'}» · ↑ ↓ выбор карты`
+      : !state.model &&
+          !Object.values(state.manual?.weights || {}).some(Boolean)
         ? 'Все веса нулевые: черновик одинаков для всех карт.'
         : 'Изменения правила пересчитываются по фичам в памяти.';
 }
@@ -506,14 +875,18 @@ async function setLabel(
   value,
   partition = $('validation').checked ? 'validation' : 'train',
   undo = false,
+  tagId = state.tag?.id,
 ) {
-  const row = selectedRow(),
-    tagId = state.tag?.id;
-  if (!row || !tagId || state.saving || state.loading) return;
-  const previous = row.label;
+  const row = selectedRow();
+  if (!row || !tagId || state.saving || state.loading || !labelsReady()) return;
+  const previous = currentMapLabels()[tagId];
   state.saving = true;
   renderSelected();
-  $('validation').checked = partition === 'validation';
+  renderMultiTag();
+  renderTags();
+  syncControls();
+  if (tagId === state.tag?.id)
+    $('validation').checked = partition === 'validation';
   try {
     const label = await api(`/tags/${tagId}/labels`, {
       method: 'POST',
@@ -524,20 +897,32 @@ async function setLabel(
         expected_event_id: previous?.id || null,
       },
     });
-    row.label = label;
-    if (tagId === state.tag?.id)
-      state.undo = undo
-        ? null
-        : {
-            analysis_id: row.analysis_id,
-            value: previous?.value || 'unreviewed',
-            partition: previous?.partition || 'train',
-          };
+    const labels = state.mapLabels.get(row.analysis_id);
+    if (labels) labels[tagId] = label;
+    if (tagId === state.tag?.id) {
+      const current = state.data?.rows.find(
+        (item) => item.analysis_id === row.analysis_id,
+      );
+      if (current) current.label = label;
+    }
+    state.undo = undo
+      ? null
+      : {
+          tag_id: tagId,
+          analysis_id: row.analysis_id,
+          expected_event_id: label.id,
+          value: previous?.value || 'unreviewed',
+          partition: previous?.partition || 'train',
+        };
     toast(undo ? 'Решение отменено. История сохранена.' : 'Решение сохранено');
   } catch (error) {
     toast(error.message, true);
+    state.mapLabels.delete(row.analysis_id);
+    if (state.selected === row.analysis_id) await loadMapLabels();
   } finally {
     state.saving = false;
+    renderTags();
+    syncControls();
     renderAll();
   }
 }
@@ -562,7 +947,9 @@ async function trainModel() {
     syncControls();
     renderAll();
     schedulePreview();
-    toast('Baseline обучен на ручных решениях. Контрольные примеры не участвовали.');
+    toast(
+      'Baseline обучен на ручных решениях. Контрольные примеры не участвовали.',
+    );
   } catch (error) {
     toast(error.message, true);
   } finally {
@@ -580,14 +967,19 @@ async function saveRule() {
     bias: state.model ? 0 : state.manual.bias,
     weights: state.model
       ? {}
-      : Object.fromEntries(Object.entries(state.manual.weights).filter(([, value]) => value)),
+      : Object.fromEntries(
+          Object.entries(state.manual.weights).filter(([, value]) => value),
+        ),
     normalizer: state.model ? null : state.manual.normalizer,
     model_id: state.model?.id || null,
     profile_sha256: state.data.profile_sha256,
     dataset_sha256: state.data.dataset_sha256,
   };
   try {
-    const rule = await api(`/tags/${tagId}/rules`, { method: 'POST', body: specification });
+    const rule = await api(`/tags/${tagId}/rules`, {
+      method: 'POST',
+      body: specification,
+    });
     if (tagId === state.tag?.id) {
       state.rules.unshift(rule);
       renderRules();
@@ -613,7 +1005,9 @@ async function loadRule(id) {
     state.model = null;
     state.manual = {
       weights: {
-        ...Object.fromEntries(state.data.feature_catalog.map((item) => [item.key, 0])),
+        ...Object.fromEntries(
+          state.data.feature_catalog.map((item) => [item.key, 0]),
+        ),
         ...rule.weights,
       },
       bias: rule.bias,
@@ -628,6 +1022,10 @@ async function loadRule(id) {
 }
 function setMode(mode) {
   state.mode = mode;
+  if (mode === 'label') {
+    if (['score', 'boundary'].includes($('sort').value)) $('sort').value = 'id';
+    if ($('filter').value === 'disagree') $('filter').value = 'all';
+  }
   for (const [key, id] of [
     ['label', 'tab-label'],
     ['rule', 'tab-rule'],
@@ -642,6 +1040,11 @@ $('new-tag').onclick = () => {
   $('tag-dialog').showModal();
   $('tag-name').focus();
 };
+$('new-tag-label').onclick = $('new-tag').onclick;
+$('label-tag-select').onchange = (event) => {
+  const tag = state.tags.find((item) => item.id === event.target.value);
+  if (tag) chooseTag(tag);
+};
 $('close-dialog').onclick = () => $('tag-dialog').close();
 $('tag-form').onsubmit = async (event) => {
   event.preventDefault();
@@ -650,7 +1053,10 @@ $('tag-form').onsubmit = async (event) => {
   try {
     const tag = await api('/tags', {
       method: 'POST',
-      body: { name: $('tag-name').value, description: $('tag-definition').value },
+      body: {
+        name: $('tag-name').value,
+        description: $('tag-definition').value,
+      },
     });
     state.tags.push(tag);
     $('tag-dialog').close();
@@ -697,21 +1103,69 @@ for (const id of ['search', 'filter', 'sort'])
 document.querySelectorAll('[data-label]').forEach((button) => {
   button.onclick = () => setLabel(button.dataset.label);
 });
-$('validation').onchange = () => setLabel(selectedRow()?.label?.value || 'unreviewed');
-$('undo').onclick = () => {
+$('validation').onchange = () =>
+  setLabel(selectedRow()?.label?.value || 'unreviewed');
+$('clear-label').onclick = () => setLabel('unreviewed');
+$('undo').onclick = async () => {
   if (state.undo) {
     const previous = state.undo;
-    state.selected = previous.analysis_id;
-    setLabel(previous.value, previous.partition, true);
+    selectMap(previous.analysis_id);
+    await loadMapLabels();
+    if (
+      currentMapLabels()[previous.tag_id]?.id !== previous.expected_event_id
+    ) {
+      state.undo = null;
+      renderSelected();
+      toast(
+        'После этого решения метка уже изменилась. Отмена недоступна.',
+        true,
+      );
+      return;
+    }
+    setLabel(previous.value, previous.partition, true, previous.tag_id);
   }
+};
+const dropzone = $('tag-dropzone');
+dropzone.ondragover = (event) => {
+  if (
+    state.mode !== 'label' ||
+    !labelsReady() ||
+    state.saving ||
+    state.loading ||
+    !event.dataTransfer.types.includes('application/x-osu-lab-tag')
+  )
+    return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'copy';
+  dropzone.classList.add('drag-over');
+};
+dropzone.ondragleave = (event) => {
+  if (!dropzone.contains(event.relatedTarget))
+    dropzone.classList.remove('drag-over');
+};
+document.addEventListener('dragend', () =>
+  dropzone.classList.remove('drag-over'),
+);
+dropzone.ondrop = (event) => {
+  event.preventDefault();
+  dropzone.classList.remove('drag-over');
+  const id = event.dataTransfer.getData('application/x-osu-lab-tag');
+  if (
+    state.tags.some((tag) => tag.id === id) &&
+    currentMapLabels()[id]?.value !== 'yes'
+  )
+    setLabel('yes', currentMapLabels()[id]?.partition || 'train', false, id);
 };
 $('train-model').onclick = trainModel;
 $('save-rule').onclick = saveRule;
 $('saved-rules').onchange = (event) => loadRule(event.target.value);
 document.addEventListener('keydown', (event) => {
-  if ($('tag-dialog').open || ['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName))
+  if (
+    $('tag-dialog').open ||
+    ['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName)
+  )
     return;
-  if (['1', '2', '3'].includes(event.key)) {
+  if (state.mode === 'label' && ['1', '2', '3'].includes(event.key)) {
     event.preventDefault();
     setLabel({ 1: 'yes', 2: 'no', 3: 'unsure' }[event.key]);
   }
@@ -720,13 +1174,23 @@ document.addEventListener('keydown', (event) => {
     const rows = displayedRows(),
       index = rows.findIndex(({ row }) => row.analysis_id === state.selected);
     const next =
-      rows[Math.max(0, Math.min(rows.length - 1, index + (event.key === 'ArrowDown' ? 1 : -1)))];
+      rows[
+        Math.max(
+          0,
+          Math.min(
+            rows.length - 1,
+            index + (event.key === 'ArrowDown' ? 1 : -1),
+          ),
+        )
+      ];
     if (next) {
-      state.selected = next.row.analysis_id;
-      renderAll();
-      document
-        .querySelector(`tr[data-id="${state.selected}"]`)
-        ?.scrollIntoView({ block: 'nearest' });
+      const mapHadFocus = event.target.closest('.map-row');
+      selectMap(next.row.analysis_id);
+      const button = document.querySelector(
+        `.map-row[data-id="${state.selected}"]`,
+      );
+      if (mapHadFocus) button?.focus({ preventScroll: true });
+      button?.scrollIntoView({ block: 'nearest' });
     }
   }
 });
@@ -741,7 +1205,10 @@ $('file-input').onchange = async (event) => {
     for (const [index, file] of files.entries()) {
       $('upload').textContent = `Анализ ${index + 1}/${files.length}`;
       try {
-        if (file.size > 4 * 1024 * 1024 || !file.name.toLowerCase().endsWith('.osu'))
+        if (
+          file.size > 4 * 1024 * 1024 ||
+          !file.name.toLowerCase().endsWith('.osu')
+        )
           throw new Error('Нужен .osu до 4 MiB');
         const response = await fetch('/analyses', {
           method: 'POST',
@@ -756,10 +1223,12 @@ $('file-input').onchange = async (event) => {
       }
     }
     await loadDataset();
-    toast(`Обработано ${succeeded} файлов${failed ? `; ошибок: ${failed}` : ''}`);
+    toast(
+      `Обработано ${succeeded} файлов${failed ? `; ошибок: ${failed}` : ''}`,
+    );
   } finally {
     $('upload').disabled = false;
-    $('upload').textContent = '＋ Добавить .osu';
+    $('upload').textContent = '＋ .osu';
     event.target.value = '';
   }
 };
