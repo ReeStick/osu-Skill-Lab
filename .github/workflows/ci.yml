@@ -46,17 +46,7 @@ jobs:
         options: >-
           --health-cmd "rabbitmq-diagnostics -q ping"
           --health-interval 5s --health-timeout 5s --health-retries 20
-      browser:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: npm install --prefix "$RUNNER_TEMP/browser" --no-audit --no-fund playwright@1.56.1
-      - run: node "$RUNNER_TEMP/browser/node_modules/playwright/cli.js" install --with-deps chromium
-      - run: node tests/web/workbench-browser.cjs
-        env:
-          NODE_PATH: ${{ runner.temp }}/browser/node_modules
-
-  postgres:
+      postgres:
         image: postgres:17-bookworm
         env:
           POSTGRES_USER: osu_lab
