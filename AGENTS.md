@@ -88,6 +88,16 @@ states/cancel, PostgreSQL outbox/leases, RabbitMQ dispatcher и worker. Raw byte
 Контракты: `docs/architecture/batch-processing.md`, ADR-0007. Автоматического
 official→mirror fallback нет; sources по-прежнему выбираются явно.
 
+## Основной UI после переработки 2026-11-01
+
+Владелец согласовал map-first `/lab` и browser `.osu` preview. Старые эксперименты
+в `/lab/research`; current-profile каталог имеет отдельный paginated/search endpoint.
+Исходники/audio только в RAM браузера, checksum обязателен перед просмотром.
+Approximate preview не считать стабильным gameplay decoder. При изменениях UI
+проверять `node --test tests/web/*.test.mjs` и browser smoke из tests/README.md.
+Новые события получают group partition в UI, существующие сохраняют прошлую роль.
+Контракт: ADR-0011; старое описание выше относится к исследовательскому срезу.
+
 ## Команды из корня
 
 ```text

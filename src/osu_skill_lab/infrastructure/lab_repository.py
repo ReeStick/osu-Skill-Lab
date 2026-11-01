@@ -2,7 +2,7 @@ from dataclasses import asdict
 from typing import cast
 from uuid import UUID, uuid4
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from osu_skill_lab.analysis.features import BasicFeatures
@@ -118,6 +118,8 @@ async def dataset_rows(
     *,
     limit: int = 500,
     analysis_ids: list[int] | None = None,
+    after_id: int = 0,
+    search: str = "",
 ) -> tuple[list[LabRow], bool]:
     profile = current_profile()
     query = (
@@ -130,6 +132,15 @@ async def dataset_rows(
         )
         .order_by(AnalysisResult.id)
     )
+    query = query.where(AnalysisResult.id > after_id)
+    if search:
+        query = query.where(
+            or_(
+                BeatmapInput.title.icontains(search, autoescape=True),
+                BeatmapInput.artist.icontains(search, autoescape=True),
+                BeatmapInput.difficulty_name.icontains(search, autoescape=True),
+            )
+        )
     if analysis_ids is not None:
         query = query.where(AnalysisResult.id.in_(analysis_ids))
     rows = (await session.execute(query.limit(limit + 1))).all()

@@ -9,6 +9,7 @@ from fastapi import Path as PathParameter
 from fastapi.responses import FileResponse
 
 from osu_skill_lab.application.lab_contracts import (
+    CollectionPage,
     DatasetView,
     LabelView,
     LabelWrite,
@@ -59,6 +60,22 @@ Service = Annotated[LabService, Depends(lab_service)]
 @router.get("/", include_in_schema=False)
 async def index() -> FileResponse:
     return FileResponse(ASSETS / "index.html", headers={"Cache-Control": "no-cache"})
+
+
+@router.get("/research", include_in_schema=False)
+async def research() -> FileResponse:
+    return FileResponse(ASSETS / "research.html", headers={"Cache-Control": "no-cache"})
+
+
+@router.get("/api/collection", response_model=CollectionPage)
+async def collection(
+    service: Service,
+    after_id: Annotated[int, Query(ge=0, le=2**63 - 1)] = 0,
+    q: Annotated[str, Query(max_length=200)] = "",
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> CollectionPage:
+    async with _errors():
+        return await service.collection(after_id=after_id, search=q.strip(), limit=limit)
 
 
 @router.get("/api/tags", response_model=list[TagView])

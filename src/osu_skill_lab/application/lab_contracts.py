@@ -118,6 +118,11 @@ class LabRow(Contract):
     label: LabelView | None = None
 
 
+class CollectionPage(Contract):
+    rows: list[LabRow]
+    next_cursor: int | None
+
+
 class Normalizer(Contract):
     means: dict[str, Scalar]
     scales: dict[str, Scalar]
