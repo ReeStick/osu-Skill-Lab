@@ -16,6 +16,7 @@ from osu_skill_lab.analysis.label_baseline import TrainingExample, TrainingResul
 from osu_skill_lab.application.lab_contracts import (
     FEATURE_KEYS,
     FEATURE_TITLES,
+    CollectionPage,
     DatasetView,
     LabelView,
     LabelWrite,
@@ -128,6 +129,13 @@ class LabService:
                 await self._tag(session, tag_id)
             rows, truncated = await repository.dataset_rows(session, tag_id, limit=limit)
         return await asyncio.to_thread(make_dataset, rows, truncated)
+
+    async def collection(self, *, after_id: int, search: str, limit: int) -> CollectionPage:
+        async with self._session() as session:
+            rows, more = await repository.dataset_rows(
+                session, None, limit=limit, after_id=after_id, search=search
+            )
+        return CollectionPage(rows=rows, next_cursor=rows[-1].analysis_id if more else None)
 
     async def label(self, tag_id: UUID, body: LabelWrite) -> LabelView:
         async with self._session() as session:

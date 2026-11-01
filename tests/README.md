@@ -33,3 +33,25 @@ Workbench: `tests/unit/test_lab.py`, `tests/integration/test_lab.py`,
 Python/JS parity test использует Node при наличии; без Node он skip.
 PostgreSQL tests проверяют labels/optimistic conflict, версии, настоящий CPU train,
 model lineage и повреждённый artifact; синтетические labels не записываются в dev БД.
+
+Новый основной экран:
+
+```sh
+node --test tests/web/*.test.mjs
+# Только dev/CI; Node не нужен запущенному приложению.
+npm install --prefix .tools/browser --no-audit --no-fund playwright@1.56.1
+node .tools/browser/node_modules/playwright/cli.js install chromium
+NODE_PATH="$PWD/.tools/browser/node_modules" node tests/web/workbench-browser.cjs
+```
+
+Browser smoke использует настоящий Chromium, статические assets приложения,
+настоящий parser Web Worker и **синтетический HTTP API**, без пользовательских
+данных. Это проверка UI, не замена PostgreSQL integration. Проверяются разметка,
+конфликты, undo, импорт/preview checksum, перемотка, поиск/пагинация, смена карты,
+темы и ширины 1280/768/390/320. Скриншоты опционально:
+`OSU_LAB_SCREENSHOT_DIR=.tools/ui-qa`. Для имеющегося Chromium можно задать
+`OSU_LAB_BROWSER_EXECUTABLE`. В CI браузерная проверка — отдельная job.
+
+`test_collection_paginates_searches_and_preserves_research_endpoint` в
+`integration/test_lab.py` требует настоящую PostgreSQL `_test` БД и проверяет
+cursor/search (включая буквальные `%`/`_`), совместимость профиля и старый API.

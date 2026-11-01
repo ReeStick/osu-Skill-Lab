@@ -1,5 +1,17 @@
 # Текущее состояние
 
+## 2026-11-01 — Карта и простая разметка
+
+- [x] Новый `/lab`: коллекция, проверка одного тега, optimistic undo.
+- [x] Локальный checksum-verified browser preview .osu + отдельное audio.
+- [x] Cursor/search каталога; старые эксперименты сохранены в `/lab/research`.
+- [x] Автоматическая групповая partition новых решений, прежние роли сохранены.
+- [x] JS/targeted Python и Chromium smoke; подробнее в [devlog](docs/devlog/2026-11-01-map-first-workbench.md).
+- [ ] PostgreSQL integration и Docker проверка новой версии в среде с сервисами.
+- [ ] Точное отображение stacking/ticks и получение исходников без ручного выбора.
+
+Контракт: [ADR-0011](docs/adr/0011-map-first-workbench.md). Ниже — история предыдущих срезов.
+
 Передача контекста: [HANDOFF](HANDOFF.md). По замечаниям владельца переработан `/lab`:
 аналитика и разметка разделены, выбор карт справа, светлая/спокойная тёмная темы,
 multi-tag click/drag-and-drop, signed metric contributions и мини-гистограммы.

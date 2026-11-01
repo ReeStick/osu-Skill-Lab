@@ -283,3 +283,35 @@ async def test_cancelled_training_retains_admission_until_cpu_releases(
                 await asyncio.sleep(0.02)
             assert not service._training_slots.empty()
             assert await service.models(UUID(tag)) == []
+
+
+async def test_collection_paginates_searches_and_preserves_research_endpoint(
+    lab_app: FastAPI, migrated_engine: AsyncEngine
+) -> None:
+    ids = await seed(migrated_engine, count=3)
+    async with async_sessionmaker(migrated_engine)() as session, session.begin():
+        from osu_skill_lab.infrastructure.models import BeatmapInput
+
+        result = await session.get(AnalysisResult, ids[2])
+        assert result is not None
+        source = await session.get(BeatmapInput, result.input_id)
+        assert source is not None
+        source.title = "Rare 100%_map"
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=lab_app), base_url="http://test"
+    ) as client:
+        first = (await client.get("/lab/api/collection?limit=2")).json()
+        assert [row["analysis_id"] for row in first["rows"]] == ids[:2]
+        assert first["next_cursor"] == ids[1]
+        second = (await client.get(f"/lab/api/collection?after_id={ids[1]}&limit=2")).json()
+        assert [row["analysis_id"] for row in second["rows"]] == ids[2:]
+        assert second["next_cursor"] is None
+        search = (await client.get("/lab/api/collection", params={"q": "100%_"})).json()
+        assert [row["analysis_id"] for row in search["rows"]] == ids[2:]
+        assert (await client.get("/lab/api/collection", params={"q": "absent"})).json()[
+            "rows"
+        ] == []
+        for params in ({"limit": 101}, {"after_id": -1}, {"q": "x" * 201}):
+            assert (await client.get("/lab/api/collection", params=params)).status_code == 422
+        assert (await client.get("/lab/api/dataset")).status_code == 200
+        assert "research.js" in (await client.get("/lab/research")).text
